@@ -24,43 +24,43 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Joke generation tool class providing random joke generation functionality.
+ * 笑话生成工具类，提供随机生成笑话的功能。
  * <p>
- * This tool class has a built-in collection of carefully selected English jokes
- * and can randomly return one of them. Mainly used for entertainment scenarios,
- * providing users with relaxed and pleasant interactive experiences. The joke
- * content is healthy and positive, suitable for users of all ages.
+ * 本工具类内置精心筛选的英文笑话库，
+ * 可随机返回其中一条。主要用于娱乐场景，
+ * 为用户提供轻松愉悦的交互体验。笑话内容
+ * 健康积极，适合全年龄段用户。
  * </p>
  *
- * <p><strong>Features:</strong></p>
+ * <p><strong>功能特性：</strong></p>
  * <ul>
- *   <li>Built-in 10 carefully selected English jokes</li>
- *   <li>Uses secure random number generator to ensure randomness</li>
- *   <li>Thread-safe implementation</li>
- *   <li>Comprehensive error handling mechanism</li>
+ *   <li>内置10则精选英文笑话</li>
+ *   <li>采用安全随机数生成器确保随机性</li>
+ *   <li>线程安全实现机制</li>
+ *   <li>全面的错误处理机制</li>
  * </ul>
  *
- * <p><strong>Joke Themes:</strong></p>
+ * <p><strong>笑话主题：</strong></p>
  * <ul>
- *   <li>Science Humor - Atom and scientist related jokes</li>
- *   <li>Workplace Humor - Work and award related jokes</li>
- *   <li>Life Humor - Daily life scenario jokes</li>
- *   <li>Word Play - Puns and homophone jokes</li>
+ *   <li>科学幽默 - 涉及原子与科学家的笑话</li>
+ *   <li>职场幽默 - 工作与奖项相关的笑话</li>
+ *   <li>生活幽默 - 日常场景笑话</li>
+ *   <li>文字游戏 - 双关语与同音异义笑话</li>
  * </ul>
  *
- * <p><strong>Usage Example:</strong></p>
+ * <p><strong>使用示例：</strong></p>
  * <pre>{@code
  * JokeTools jokeTools = new JokeTools();
  *
- * // Get random joke
- * String joke = (String) jokeTools.call("joke_tool");
+ * // 获取随机笑话
+ * String joke = (String) jokeTools.call(“joke_tool”);
  * System.out.println(joke);
  * }</pre>
  *
- * @author OxyGent Team
+ * @author OxyGent 团队
  * @version 1.0.0
- * @see FunctionHub Tool execution framework base class
- * @see SecureRandom Secure random number generator
+ * @see FunctionHub 工具执行框架基类
+ * @see SecureRandom 安全随机数生成器
  * @since 1.0.0
  */
 @SuperBuilder

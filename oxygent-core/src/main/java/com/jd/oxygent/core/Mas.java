@@ -57,27 +57,27 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * OxyGent Multi-Agent System Core Management Class
+ * OxyGent 多智能体系统核心管理类
  * <p>
- * This class is responsible for managing the entire lifecycle of the multi-agent system, including:
- * - System startup and initialization
- * - Component registration and management
- * - Agent organization structure
- * - Resource management and scheduling
- * - Task execution and coordination
- * - Data persistence and caching
+ * 本类管理多智能体系统的完整生命周期，包括：
+ * - 系统启动与初始化
+ * - 组件注册与管理
+ * - 智能体组织结构
+ * - 资源管理与调度
+ * - 任务执行与协调
+ * - 数据持久化与缓存
  * <p>
- * Core attribute descriptions:
- * - name: MAS instance identifier
- * - oxyNameToOxy: Mapping table from Oxy names to instances (registry)
- * - oxySpace: List of registered Oxy instances
- * - masterAgentName: Master agent name (BaseAgent instance)
- * - activeTasks: Active task management dictionary for SSE and async operations
- * - esClient/redisClient/vearchClient: Elasticsearch, Redis, Vearch database clients
- * - agentOrganization: Agent organization structure
- * - lock: Task execution flow control lock
+ * 核心属性说明：
+ * - name：多智能体实例标识符
+ * - oxyNameToOxy：Oxy名称到实例的映射表（注册表）
+ * - oxySpace：已注册Oxy实例列表
+ * - masterAgentName：主智能体名称（BaseAgent实例）
+ * - activeTasks：用于SSE和异步操作的活动任务管理字典
+ * - esClient/redisClient/vearchClient：Elasticsearch、Redis、Vearch数据库客户端
+ * - agentOrganization：代理组织结构
+ * - lock：任务执行流控制锁
  *
- * @author OxyGent Team
+ * @author OxyGent团队
  * @version 1.0.0
  * @since 1.0.0
  */
