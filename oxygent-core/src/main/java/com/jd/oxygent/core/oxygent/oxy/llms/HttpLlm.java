@@ -16,6 +16,7 @@
 package com.jd.oxygent.core.oxygent.oxy.llms;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.NullNode;
 import com.jd.oxygent.core.oxygent.utils.JsonUtils;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyResponse;
@@ -413,7 +414,11 @@ public class HttpLlm extends RemoteLlm {
                         JsonNode parts = content.get("parts");
                         if (parts != null && parts.isArray() && parts.size() > 0) {
                             JsonNode text = parts.get(0).get("text");
-                            return text != null ? text.asText() : null;
+                            if (text == null || (text instanceof NullNode nn && nn.isNull())) {
+                                return null;
+                            } else {
+                                return text.asText();
+                            }
                         }
                     }
                 }
@@ -423,14 +428,22 @@ public class HttpLlm extends RemoteLlm {
                     JsonNode delta = choices.get(0).get("delta");
                     if (delta != null) {
                         JsonNode content = delta.get("content");
-                        return content != null ? content.asText() : null;
+                        if (content == null || (content instanceof NullNode nn && nn.isNull())) {
+                            return null;
+                        } else {
+                            return content.asText();
+                        }
                     }
                 }
             } else {
                 JsonNode message = node.get("message");
                 if (message != null) {
                     JsonNode content = message.get("content");
-                    return content != null ? content.asText() : null;
+                    if (content == null || (content instanceof NullNode nn && nn.isNull())) {
+                        return null;
+                    } else {
+                        return content.asText();
+                    }
                 }
             }
         } catch (Exception e) {
