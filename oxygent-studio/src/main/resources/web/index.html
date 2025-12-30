@@ -163,9 +163,9 @@
                     <img class="empty-img" src="image/empty.svg" alt="">
                 </div>
             </div>
-                <button id="agent_log_close_id" onclick="closeRight()">
-                    <img src="image/group_close.svg" alt=""/>
-                </button>
+            <button id="agent_log_close_id" onclick="closeRight()">
+                <img src="image/group_close.svg" alt=""/>
+            </button>
         </div>
 
     </div>
@@ -186,6 +186,9 @@
     var show_id = 0;
     var agent_id_dict = {};
     var agent_organization = {};
+    var current_streaming_agent = null; // Name of the agent currently streaming output (for backward compatibility)
+    var current_streaming_element = null; // The DOM element currently streaming output (for backward compatibility)
+    var streaming_elements_map = {}; // Store streaming output elements corresponding to different node_ids: { node_id: { agent, element } }
 
     var master_agent_name = "master_agent";
     var div_right = $("#agent_log");
@@ -543,6 +546,13 @@
             return;
         }
         let jm = JSON.parse(message);
+
+        // Process streaming output messages
+        if (jm["type"] === "stream") {
+            handle_stream_message(jm);
+            return;
+        }
+
         if (!["tool_call", "observation"].includes(jm["type"])) {
             return;
         }
@@ -560,7 +570,7 @@
                 history["agent_log"] = JSON.parse(JSON.stringify(plan_dict[jm["content"]["callee"]]));
             }
 
-            if (jm["content"]["callee_category"] === 'agent' || jm["content"]["callee_category"] === 'tool') {
+            if (jm["content"]["callee_category"] === 'agent' || jm["content"]["callee_category"] === 'tool' || jm["content"]["callee_category"] === 'bank') {
                 add_tool_call(jm["content"]["call_stack"].slice(1));
                 history["tool_call"] = getNodeColors(get_all_tool_calls());
             }
@@ -574,7 +584,11 @@
                 chats.push(msg);
                 history["answer"] = JSON.parse(JSON.stringify(chats));
             } else if (jm["content"]["caller_category"] === 'agent' && jm["content"]["callee_category"] === 'llm') {
-                // 开始调用llm
+                // Start calling LLM and prepare for streaming output.
+                current_streaming_agent = jm["content"]["caller"];
+                var node_id = jm["content"]["node_id"];
+                // Create the message element for streaming output.
+                create_streaming_message_element(current_streaming_agent, node_id);
                 return;
             }
         }
@@ -587,13 +601,44 @@
                 if (typeof markdownInput !== 'string') {
                     markdownInput = JSON.stringify(markdownInput, null, 2);
                 }
+                // If a streaming output element exists, use its content (which may be more complete).
+                // Look up the corresponding streaming output element (prefer node_id; otherwise, fall back to agent
+                var node_id = jm["content"]["node_id"];
+                var agent_name = jm["content"]["callee"];
+                var key = node_id || agent_name;
+                var streaming_info = streaming_elements_map[key];
+
+                if (streaming_info && streaming_info.element) {
+                    var finalContent = streaming_info.element.text();
+                    if (finalContent) {
+                        markdownInput = finalContent;
+                    }
+                    // Remove the streaming-content class and clean up
+                    streaming_info.element.removeClass("streaming-content");
+                    delete streaming_elements_map[key];
+                } else if (current_streaming_element && current_streaming_agent) {
+                    // for backward compatibility
+                    var finalContent = current_streaming_element.text();
+                    if (finalContent) {
+                        markdownInput = finalContent;
+                    }
+                }
+
                 var msg = {"role": jm["content"].callee, "content": markdownInput};
                 chats.push(msg);
                 history["answer"] = JSON.parse(JSON.stringify(chats));
                 llm_is_work = false;
                 // $("#message_send").text("Send");
-                // 重置react_memory
+                // react_memory
                 plan_dict = {};
+                // Streaming output complete; remove the streaming-content class (for backward compatibility).
+                if (current_streaming_element) {
+                    current_streaming_element.removeClass("streaming-content");
+                    current_streaming_element = null;
+                }
+                current_streaming_agent = null;
+                // Clean up all streaming output elements.
+                streaming_elements_map = {};
             } else if (jm["content"]["caller_category"] === 'agent' && jm["content"]["callee_category"] === 'agent') {
                 push_plan(jm["content"]["caller"], "observation", jm["content"].output, jm["content"].node_id, jm["content"]["callee"]);
                 history["agent_log"] = JSON.parse(JSON.stringify(plan_dict[jm["content"]["caller"]]));
@@ -608,12 +653,27 @@
             } else if (jm["content"]["caller_category"] === 'agent' && jm["content"]["callee_category"] === 'llm') {
                 push_plan(jm["content"]["caller"], "plan", jm["content"].output, jm["content"].node_id, jm["content"]["callee"]);
                 history["agent_log"] = JSON.parse(JSON.stringify(plan_dict[jm["content"]["caller"]]));
-            } else if (jm["content"]["caller_category"] === 'agent' && ['tool'].includes(jm["content"]["callee_category"])) {
+                // Streaming output complete; remove the streaming-content class.
+                // Note: planning content is not saved to chats, only to plan_dict.
+                var node_id = jm["content"]["node_id"];
+                var key = node_id || jm["content"]["caller"];
+                var streaming_info = streaming_elements_map[key];
+                if (streaming_info && streaming_info.element) {
+                    streaming_info.element.removeClass("streaming-content");
+                    delete streaming_elements_map[key];
+                }
+                // For backward compatibility
+                if (current_streaming_element) {
+                    current_streaming_element.removeClass("streaming-content");
+                    current_streaming_element = null;
+                }
+                current_streaming_agent = null;
+            } else if (jm["content"]["caller_category"] === 'agent' && ['tool', 'bank', 'memory_bank'].includes(jm["content"]["callee_category"])) {
                 push_plan(jm["content"]["caller"], "observation", jm["content"].output, jm["content"].node_id, jm["content"]["callee"]);
                 history["agent_log"] = JSON.parse(JSON.stringify(plan_dict[jm["content"]["caller"]]));
             }
 
-            if (jm["content"]["callee_category"] === 'agent' || ['tool'].includes(jm["content"]["callee_category"])) {
+            if (jm["content"]["callee_category"] === 'agent' || ['tool', 'bank', 'memory_bank'].includes(jm["content"]["callee_category"])) {
                 remove_tool_call(jm["content"]["call_stack"].slice(1));
                 history["tool_call"] = getNodeColors(get_all_tool_calls());
             }
@@ -658,6 +718,8 @@
                     tool: './image/org_tool.svg',
                     model: './image/org_model.svg',
                     flow: './image/org_flow.svg',
+                    bank: './image/org_knowledge.svg',
+                    memory_bank: './image/org_memory.svg',
                 };
                 const id = encodeList(data.path);
 
@@ -703,6 +765,82 @@
             "tool_call": []
         });
         begin();
+    }
+
+    // Create the message element for streaming output.
+    function create_streaming_message_element(agent_name, node_id) {
+        // 如果提供了node_id，使用node_id作为key
+        var key = node_id || agent_name;
+
+        // Check if a streaming output element already exists.
+        if (streaming_elements_map[key]) {
+            return streaming_elements_map[key].element;
+        }
+
+        var li = $("<li>");
+        var li_class = "master";
+        li.addClass(li_class);
+
+        const idx = agent_id_dict[agent_name] % 16;
+        li.append(
+            $("<img>")
+                .attr("src", agentImgMap[idx]?.imgUrl)
+                .css("background-color", agentImgMap[idx]?.bgColor)
+        );
+        li.append($("<p>").text(agent_name));
+
+        // Create an empty <span> for streaming output content and add the streaming-content class.
+        var contentSpan = $('<span class="streaming-content">');
+        li.append(contentSpan);
+
+        div_chatbox.append(li);
+
+        // Store in the map
+        streaming_elements_map[key] = {
+            agent: agent_name,
+            element: contentSpan,
+            node_id: node_id
+        };
+
+        // For backward compatibility: update global variables
+        current_streaming_element = contentSpan;
+        current_streaming_agent = agent_name;
+
+        scroll_top_div_chat_history();
+        return contentSpan;
+    }
+
+    // Handle streaming messages
+    function handle_stream_message(jm) {
+        var agent_name = jm["content"]["agent"];
+        var node_id = jm["content"]["node_id"];
+        var delta = jm["content"]["delta"] || "";
+
+        if (!delta) {
+            return;
+        }
+
+        // Get or create a streaming output element
+        if (!agent_name) {
+            agent_name = current_streaming_agent || master_agent_name;
+        }
+
+        // 获取或创建流式输出元素
+        var key = node_id || agent_name;
+        var streaming_info = streaming_elements_map[key];
+
+        if (!streaming_info) {
+            // Create a new streaming output element
+            create_streaming_message_element(agent_name, node_id);
+            streaming_info = streaming_elements_map[key];
+        }
+
+        // Append streaming content
+        if (streaming_info && streaming_info.element) {
+            var currentText = streaming_info.element.text();
+            streaming_info.element.text(currentText + delta);
+            scroll_top_div_chat_history();
+        }
     }
 
     function send_msg_to_chatbox(msg, name = "user", at = "", scroll_top = true) {

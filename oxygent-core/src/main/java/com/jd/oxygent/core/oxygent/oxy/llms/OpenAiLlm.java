@@ -70,7 +70,7 @@ public class OpenAiLlm extends RemoteLlm {
         Map<String, Object> payload = new HashMap<>(Map.of(
                 "messages", this._getMessages(oxyRequest),
                 "model", this.modelName,
-                "stream", false
+                "stream", true
         ));
         payload.putAll(llmConfig);
         if (this.llmParams != null) {
