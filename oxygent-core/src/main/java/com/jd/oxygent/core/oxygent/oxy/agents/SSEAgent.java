@@ -400,7 +400,7 @@ public class SSEAgent extends RemoteAgent {
                             }
 
                             // Check if end signal is received
-                            if ("done".equals(data) || "DONE".equals(data)) {
+                            if ("DONE".equalsIgnoreCase(data) || "[DONE]".equalsIgnoreCase(data)) {
                                 log.info("Received request to terminate SSE connection: {}. {}", data, getServerUrl());
                                 latch.countDown(); // Notify main thread that processing is complete
                                 return;
