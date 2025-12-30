@@ -531,6 +531,7 @@ public abstract class BaseLlM extends BaseOxy {
                     message.put("caller_category", oxyRequest.getCallerCategory());
                     message.put("callee", oxyRequest.getCallee());
                     message.put("callee_category", oxyRequest.getCalleeCategory());
+                    message.put("agent", oxyRequest.getCaller());
                     message.put("content", msg);
                     oxyRequest.sendMessage(message);
                 }
