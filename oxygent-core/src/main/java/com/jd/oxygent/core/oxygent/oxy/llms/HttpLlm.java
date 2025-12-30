@@ -61,6 +61,8 @@ import java.util.Map;
 public class HttpLlm extends RemoteLlm {
     private static final Logger logger = LoggerFactory.getLogger(HttpLlm.class);
 
+    /** Http Client Version */
+    private HttpClient.Version httpVersion = null;
     private static volatile HttpClient httpClient = null;
     @Builder.Default
     private String streamOutputType = "stream";
@@ -206,7 +208,7 @@ public class HttpLlm extends RemoteLlm {
         } else {
             payload.put("messages", this._getMessages(oxyRequest));
             payload.put("model", modelName);
-            payload.put("stream", false);
+            payload.put("stream", true);
             if (llmParams != null) {
                 payload.putAll(llmParams);
             }
@@ -236,6 +238,9 @@ public class HttpLlm extends RemoteLlm {
                 .timeout(Duration.ofSeconds((long) this.getTimeout()))
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
 
+        if (this.httpVersion != null) {
+            requestBuilder.version(this.httpVersion);
+        }
         requestHeaders.forEach(requestBuilder::header);
         HttpRequest request = requestBuilder.build();
 
@@ -339,6 +344,9 @@ public class HttpLlm extends RemoteLlm {
                 .timeout(Duration.ofSeconds((long) this.getTimeout()))
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
 
+        if (this.httpVersion != null) {
+            requestBuilder.version(this.httpVersion);
+        }
         requestHeaders.forEach(requestBuilder::header);
         HttpRequest request = requestBuilder.build();
 
