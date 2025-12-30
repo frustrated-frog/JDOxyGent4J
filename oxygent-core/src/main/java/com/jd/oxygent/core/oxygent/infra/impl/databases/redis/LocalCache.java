@@ -15,7 +15,6 @@
  */
 package com.jd.oxygent.core.oxygent.infra.impl.databases.redis;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jd.oxygent.core.oxygent.infra.databases.BaseDB;
 import com.jd.oxygent.core.oxygent.infra.databases.BaseCache;
 import com.jd.oxygent.core.oxygent.utils.JsonUtils;
@@ -23,11 +22,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * <h3>Local Redis Simulation Implementation</h3>
@@ -39,7 +38,7 @@ import java.util.concurrent.LinkedBlockingDeque;
  * <h3>Technical Architecture</h3>
  * <ul>
  *   <li><strong>Memory Storage</strong>: High-performance in-memory cache based on Java ConcurrentHashMap</li>
- *   <li><strong>Data Structures</strong>: Uses LinkedBlockingDeque to support Redis-style list operations</li>
+ *   <li><strong>Data Structures</strong>: Uses ConcurrentLinkedDeque (wrapped) to support Redis-style list operations with high concurrency</li>
  *   <li><strong>Thread Safety</strong>: Comprehensive use of thread-safe data structures, supporting high concurrent access</li>
  *   <li><strong>TTL Support</strong>: Complete expiration time management, automatic cleanup of expired data</li>
  *   <li><strong>Type Support</strong>: Supports multiple Redis data types like strings, lists, hash tables</li>
@@ -110,12 +109,42 @@ import java.util.concurrent.LinkedBlockingDeque;
 public class LocalCache extends BaseDB implements BaseCache {
 
     /**
+     * Internal thread-safe list wrapper
+     * Uses ConcurrentLinkedDeque for high concurrency and AtomicInteger for size tracking.
+     */
+    private static class CacheList {
+        private final ConcurrentLinkedDeque<Object> deque = new ConcurrentLinkedDeque<>();
+        private final AtomicInteger size = new AtomicInteger(0);
+
+        void addFirst(Object o) {
+            deque.addFirst(o);
+            size.incrementAndGet();
+        }
+
+        Object removeLast() {
+            Object o = deque.pollLast();
+            if (o != null) {
+                size.decrementAndGet();
+            }
+            return o;
+        }
+
+        int size() {
+            return size.get();
+        }
+
+        boolean isEmpty() {
+            return deque.isEmpty();
+        }
+    }
+
+    /**
      * Main data storage mapping table
      * <p>
-     * Uses ConcurrentHashMap to ensure thread safety, LinkedBlockingDeque supports Redis-style list operations.
-     * Key is Redis key, value is double-ended queue structure, supporting LPUSH, RPOP operations.
+     * Uses ConcurrentHashMap to ensure thread safety, CacheList (wrapping ConcurrentLinkedDeque) supports Cache-style list operations.
+     * Key is Cache key, value is double-ended queue structure, supporting LPUSH, RPOP operations.
      */
-    private final Map<String, LinkedBlockingDeque<Object>> data;
+    private final Map<String, CacheList> data;
 
     /**
      * Key expiration time mapping table
@@ -197,8 +226,8 @@ public class LocalCache extends BaseDB implements BaseCache {
      * </ul>
      *
      * <h3>Concurrent Safety</h3>
-     * <p>Uses thread-safe features of LinkedBlockingDeque to ensure data consistency in multi-threaded environments.
-     * All operations are atomic, no data race issues will occur.</p>
+     * <p>Uses thread-safe features of CacheList (ConcurrentLinkedDeque) to ensure data consistency in multi-threaded environments.
+     * Operations are optimized for high concurrency.</p>
      *
      * @param key       List key name, cannot be null
      * @param values    Array of values to push, supports multiple data types
@@ -208,15 +237,17 @@ public class LocalCache extends BaseDB implements BaseCache {
      * @return Current length of list after push operation
      * @throws IllegalArgumentException If value type is not supported or JSON serialization fails
      */
-    public int lpush(String key, String[] values, Integer ex, Integer maxSize, Integer maxLength) {
+    public int lpush(String key, Object[] values, Integer ex, Integer maxSize, Integer maxLength) {
         int expireTime = (ex != null) ? ex : defaultExpireTime;
         int listMaxSize = (maxSize != null) ? maxSize : defaultListMaxSize;
         int stringMaxLength = (maxLength != null) ? maxLength : Integer.MAX_VALUE;
 
-        LinkedBlockingDeque<Object> deque = data.computeIfAbsent(key, k -> new LinkedBlockingDeque<>());
+        CacheList list = data.computeIfAbsent(key, k -> new CacheList());
 
         // Process and validate input values
-        List<Object> newValues = new ArrayList<>();
+        // Note: JSON serialization is CPU intensive but done here to minimize blocking.
+        // We use an ArrayList to prepare values before adding to the lock-free deque.
+        List<Object> newValues = new ArrayList<>(values.length);
         for (Object value : values) {
             if (value instanceof String) {
                 String str = (String) value;
@@ -245,23 +276,24 @@ public class LocalCache extends BaseDB implements BaseCache {
         }
 
         // Add values to the left (head) of the deque
-        Collections.reverse(newValues); // Reverse to maintain proper order when adding to front
-        for (Object value : newValues) {
-            deque.addFirst(value);
+        // Optimization: Iterate backwards instead of using Collections.reverse() to save O(k) operation
+        for (int i = newValues.size() - 1; i >= 0; i--) {
+            list.addFirst(newValues.get(i));
         }
 
         // Trim to max size
-        while (deque.size() > listMaxSize) {
-            deque.removeLast();
+        // Optimization: Use lock-free check and removal
+        while (list.size() > listMaxSize) {
+            list.removeLast();
         }
 
         expiry.put(key, System.currentTimeMillis() + expireTime * 1000L);
-        return deque.size();
+        return list.size();
     }
 
     @Override
     public int lpush(String key, String... values) {
-        return lpush(key, values, null, null, null);
+        return lpush(key, (Object[]) values, null, null, null);
     }
 
     /**
@@ -272,10 +304,12 @@ public class LocalCache extends BaseDB implements BaseCache {
      */
     public String rpop(String key) {
         checkExpiry(key);
-        LinkedBlockingDeque<Object> deque = data.get(key);
-        if (deque != null && !deque.isEmpty()) {
-            Object o = deque.removeLast();
-            return o.toString();
+        CacheList list = data.get(key);
+        if (list != null) {
+            Object o = list.removeLast();
+            if (o != null) {
+                return o.toString();
+            }
         }
         return null;
     }
@@ -283,17 +317,22 @@ public class LocalCache extends BaseDB implements BaseCache {
     @Override
     public Object brpop(String key, int timeout) {
         checkExpiry(key);
-        LinkedBlockingDeque<Object> deque = data.get(key);
-        if (deque != null && !deque.isEmpty()) {
-            return deque.removeLast();
+        CacheList list = data.get(key);
+        if (list != null) {
+            Object o = list.removeLast();
+            if (o != null) return o;
         }
 
         // Simulate blocking behavior
         try {
-            Thread.sleep(timeout * 1000L);
-            deque = data.get(key);
-            if (deque != null && !deque.isEmpty()) {
-                return deque.removeLast();
+            long endTime = System.currentTimeMillis() + timeout * 1000L;
+            while (System.currentTimeMillis() < endTime) {
+                Thread.sleep(100); // Sleep for shorter interval to be more responsive
+                list = data.get(key);
+                if (list != null) {
+                    Object o = list.removeLast();
+                    if (o != null) return o;
+                }
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
