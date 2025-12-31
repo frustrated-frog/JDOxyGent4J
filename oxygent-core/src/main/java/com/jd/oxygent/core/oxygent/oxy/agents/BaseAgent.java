@@ -219,7 +219,7 @@ public abstract class BaseAgent extends BaseFlow {
                 String currentSubSessionId = oxyRequest.getCurrentTraceId() + "__" + oxyRequest.getSessionName();
                 Map<String, Object> history = new HashMap<>();
                 history.put("query", oxyRequest.getQuery());
-                history.put("answer", oxyResponse.getOutput());
+                history.put("answer",  String.valueOf(oxyResponse.getOutput()));
                 if (oxyResponse.getExtra() != null) {
                     history.putAll(oxyResponse.getExtra());
                 }

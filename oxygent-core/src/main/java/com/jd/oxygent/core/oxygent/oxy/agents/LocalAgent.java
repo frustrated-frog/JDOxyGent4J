@@ -479,7 +479,7 @@ public class LocalAgent extends BaseAgent {
 
                     // Add debug information, check parsed content length
                     if (a != null) {
-                        String answerStr = String.valueOf(a);
+                        String answerStr = a instanceof String ? (String) a : String.valueOf(a);
                         logger.debug("Parsed answer length: {}, ends with: '{}'",
                                 answerStr.length(),
                                 answerStr.length() > 50 ? answerStr.substring(Math.max(0, answerStr.length() - 50)) : answerStr);
