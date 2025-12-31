@@ -252,10 +252,11 @@ protected OxyResponse execute(OxyRequest oxyRequest) throws Exception {
         oxyRequest.getQuery(), planStr
     );
 
-    List<Map<String, Object>> tempMessages = Arrays.asList(
-        Map.of("role", "system", "content", "Please answer user questions based on the given plan."),
-        Map.of("role", "user", "content", userInputWithResults)
-    );
+    Memory tempMessages = new Memory();
+    tempMessages.setMessages(Arrays.asList(
+            Message.systemMessage("Please answer user questions based on the given plan."),
+            Message.userMessage(userInputWithResults)
+    ));
 
     var oxyResponse = oxyRequest.call(
         this.llmModel,

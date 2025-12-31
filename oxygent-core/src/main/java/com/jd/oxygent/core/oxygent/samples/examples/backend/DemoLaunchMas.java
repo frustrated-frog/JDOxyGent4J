@@ -21,6 +21,8 @@ import com.jd.oxygent.core.oxygent.oxy.agents.ReActAgent;
 import com.jd.oxygent.core.oxygent.oxy.llms.HttpLlm;
 import com.jd.oxygent.core.oxygent.oxy.mcp.StdioMCPClient;
 import com.jd.oxygent.core.oxygent.samples.server.ServerApp;
+import com.jd.oxygent.core.oxygent.schemas.memory.Memory;
+import com.jd.oxygent.core.oxygent.schemas.memory.Message;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyResponse;
 import com.jd.oxygent.core.oxygent.samples.server.masprovider.engine.annotation.OxySpaceBean;
 import com.jd.oxygent.core.oxygent.samples.server.utils.GlobalDefaultOxySpaceMapping;
@@ -101,14 +103,17 @@ public class DemoLaunchMas {
 //        arguments = new HashMap<>(Map.of("arguments", Map.of("timezone", "Asia/Shanghai")));
         mas.call("get_current_time", arguments);
 
-        arguments = new HashMap<>(Map.of("arguments",
+        Memory memory = new Memory();
+        memory.setMessages(Arrays.asList(
+                Message.systemMessage("You are a helpful assistant."),
+                Message.userMessage("hello")
+        ));
+
+        arguments = new HashMap<>(
                 Map.of(
-                        "messages", Arrays.asList(
-                                Map.of("role", "system", "content", "You are a helpful assistant."),
-                                Map.of("role", "user", "content", "hello")
-                        ),
+                        "messages", memory,
                         "llm_params", Map.of("temperature", 0.2)
-                )));
+                ));
         mas.call("default_llm", arguments);
 
         // Call Master Agent
