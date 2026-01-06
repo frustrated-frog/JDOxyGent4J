@@ -19,6 +19,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyResponse;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
@@ -93,6 +94,7 @@ public abstract class BaseFlow extends BaseOxy {
      * @since 1.0.0
      */
     @JsonProperty("is_permission_required")
+    @Builder.Default
     private boolean isPermissionRequired = true;
 
     /**
@@ -115,6 +117,7 @@ public abstract class BaseFlow extends BaseOxy {
      * @since 1.0.0
      */
     @JsonProperty("is_master")
+    @Builder.Default
     private boolean isMaster = false;
 
     /**

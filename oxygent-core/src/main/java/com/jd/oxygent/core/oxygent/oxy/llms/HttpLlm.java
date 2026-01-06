@@ -430,8 +430,13 @@ public class HttpLlm extends RemoteLlm {
                     JsonNode delta = choices.get(0).get("delta");
                     if (delta != null) {
                         JsonNode content = delta.get("content");
-                        if (content == null || (content instanceof NullNode nn && nn.isNull())) {
-                            return null;
+                        if (content == null || content.isNull()) {
+                            content = delta.get("reasoning_content");
+                            if (content == null || content.isNull()) {
+                                return null;
+                            } else {
+                                return content.asText();
+                            }
                         } else {
                             return content.asText();
                         }
@@ -439,9 +444,9 @@ public class HttpLlm extends RemoteLlm {
                 }
             } else {
                 JsonNode message = node.get("message");
-                if (message != null) {
+                if (message != null && !message.isNull()) {
                     JsonNode content = message.get("content");
-                    if (content == null || (content instanceof NullNode nn && nn.isNull())) {
+                    if (content == null || content.isNull()) {
                         return null;
                     } else {
                         return content.asText();
@@ -472,7 +477,7 @@ public class HttpLlm extends RemoteLlm {
                 }
             } else if (useOpenai) {
                 Object choices = data.get("choices");
-                if (choices instanceof List && !((List<?>) choices).isEmpty()) {
+                if (choices != null && choices instanceof List && !((List<?>) choices).isEmpty()) {
                     Map<String, Object> message = (Map<String, Object>) ((Map<String, Object>) ((List<?>) choices).get(0)).get("message");
                     if (message != null) {
                         Object content = message.get("content");

@@ -238,6 +238,20 @@ public class OxyRequest implements Cloneable {
     private boolean isSaveHistory = true;
 
     /**
+     * Whether to send message
+     */
+    @JsonProperty("is_send_message")
+    @Builder.Default
+    private boolean isSendMessage = true;
+
+    /**
+     * whether async storage is used
+     */
+    @JsonProperty("is_async_storage")
+    @Builder.Default
+    private boolean isAsyncStorage = true;
+
+    /**
      * Parallel execution ID, used to identify parallel execution task groups
      */
     @JsonProperty("parallel_id")
@@ -561,7 +575,7 @@ public class OxyRequest implements Cloneable {
      * @param message message content to send, cannot be null or empty
      */
     public void sendMessage(Map<String, Object> message) {
-        if (this.mas != null && message != null && !message.isEmpty()) {
+        if (isSendMessage && this.mas != null && message != null && !message.isEmpty()) {
             var redisKey = mas.getMessagePrefix() + ":" + mas.getName() + ":" + this.getCurrentTraceId();
             this.mas.sendMessage(message, redisKey, this);
         }

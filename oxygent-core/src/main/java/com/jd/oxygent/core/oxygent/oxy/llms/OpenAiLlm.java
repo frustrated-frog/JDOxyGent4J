@@ -18,9 +18,12 @@ package com.jd.oxygent.core.oxygent.oxy.llms;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.NullNode;
+import com.jd.oxygent.core.Config;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyResponse;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyState;
+import com.jd.oxygent.core.oxygent.utils.StringUtils;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.SuperBuilder;
@@ -65,14 +68,12 @@ public class OpenAiLlm extends RemoteLlm {
         Set<String> excludedKeys = Set.of(
                 "cls", "base_url", "api_key", "name", "model_name"
         );
-        Map<String, Objects> llmConfig = new HashMap<>();
-
         Map<String, Object> payload = new HashMap<>(Map.of(
                 "messages", this._getMessages(oxyRequest),
                 "model", this.modelName,
                 "stream", true
         ));
-        payload.putAll(llmConfig);
+        payload.putAll(Config.getLlmConfigMap());
         if (this.llmParams != null) {
             payload.putAll(this.llmParams);
         }
@@ -98,23 +99,83 @@ public class OpenAiLlm extends RemoteLlm {
                     throw new IOException("HTTP " + resp.code() + ": " + (resp.body() != null ? resp.body().string() : null));
                 }
                 JsonNode root = objectMapper.readTree(resp.body() != null ? resp.body().byteStream() : null);
-                String output = root.path("choices").path(0).path("message").path("content").asText("");
-                log.info("root: {}", root);
-                Map<String, Object> extra = new HashMap<>();
-                extra.put("usage", root.path("usage"));
-                extra.put("tokens", root.path("usage").path("total_tokens").asInt());
+                if ("true".equalsIgnoreCase((String) payload.get("stream"))) {
+                    StringBuilder answerAppend = new StringBuilder();
+                    String answer = "";
+                    boolean thinkStart = true;
+                    boolean thinkEnd = false;
+                    JsonNode reasoningContent = root.path("choices").path(0).path("delta").get("reasoning_content");
+                    if (reasoningContent != null && reasoningContent.isNull()) {
+                        if (thinkStart) {
+                            Map<String, Object> message = new HashMap<>();
+                            message.put("type", "stream");
+                            Map<String, Object> _content = new HashMap<>();
+                            _content.put("delta", "<think>");
+                            _content.put("agent", oxyRequest.getCaller());
+                            _content.put("node_id", oxyRequest.getNodeId());
+                            message.put("content", _content);
+                            oxyRequest.sendMessage(message);
+                            answerAppend.append("<think>");
+                            thinkStart = false;
+                            thinkEnd = true;
+                        }
+                        answer = reasoningContent.asText();
+                    } else {
+                        JsonNode content = root.path("choices").path(0).path("delta").get("content");
+                        if (thinkEnd) {
+                            Map<String, Object> message = new HashMap<>();
+                            message.put("type", "stream");
+                            Map<String, Object> _content = new HashMap<>();
+                            _content.put("delta", "<think>");
+                            _content.put("agent", oxyRequest.getCaller());
+                            _content.put("node_id", oxyRequest.getNodeId());
+                            message.put("content", _content);
+                            oxyRequest.sendMessage(message);
+                            answerAppend.append("</think>");
+                            thinkEnd = false;
+                        }
+                        answer = content.asText();
+                    }
+                    if (StringUtils.isNotBlank(answer)) {
+                        answerAppend.append(answer);
+                        Map<String, Object> message = new HashMap<>();
+                        message.put("type", "stream");
+                        Map<String, Object> _content = new HashMap<>();
+                        _content.put("delta", answer);
+                        _content.put("agent", oxyRequest.getCaller());
+                        _content.put("node_id", oxyRequest.getNodeId());
+                        message.put("content", _content);
+                        oxyRequest.sendMessage(message);
+                    }
+                    Map<String, Object> message = new HashMap<>();
+                    message.put("type", "stream_end");
+                    Map<String, Object> _content = new HashMap<>();
+                    _content.put("delta", "");
+                    _content.put("agent", oxyRequest.getCaller());
+                    _content.put("node_id", oxyRequest.getNodeId());
+                    message.put("content", _content);
+                    oxyRequest.sendMessage(message);
 
-                return OxyResponse.builder()
-                        .state(OxyState.COMPLETED)
-                        .output(output)
-                        .extra(extra)
-                        .oxyRequest(oxyRequest)
-                        .build();
+                    return OxyResponse.builder()
+                            .state(OxyState.COMPLETED)
+                            .output(answerAppend.toString())
+                            .oxyRequest(oxyRequest)
+                            .build();
+                } else {
+                    String output = root.path("choices").path(0).path("message").path("content").asText("");
+                    log.info("root: {}", root);
+                    return OxyResponse.builder()
+                            .state(OxyState.COMPLETED)
+                            .output(output)
+                            .oxyRequest(oxyRequest)
+                            .build();
+                }
             } catch (IOException e) {
-                log.info("Request error: {}", e.getMessage());
+                log.error("Request error: {}", e);
                 throw new RuntimeException(e);
             }
         } catch (JsonProcessingException e) {
+            log.error("JsonProcessing error: {}", e);
             throw new RuntimeException(e);
         }
 

@@ -48,7 +48,7 @@ public class DemoSseAgent {
 
         var headers = new HashMap<String, String>();
 
-        var serverUrl = "http://127.0.0.1:8092";
+        var serverUrl = "http://127.0.0.1:8080";
 
         var sseAgent = SSEAgent.builder()
                 .isMaster(true)

@@ -30,6 +30,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -311,6 +312,15 @@ public class Config {
         private boolean enabled = false;
     }
 
+    public static Map getLlmConfigMap() {
+        Map llmConfig = new HashMap<>();
+        llmConfig.put("model", llm.getModelName());
+        llmConfig.put("temperature", llm.getTemperature());
+        llmConfig.put("max_tokens", llm.getMaxTokens());
+        llmConfig.put("top_p", llm.getTopP());
+        return llmConfig;
+    }
+
     public static String getAppName() {
         return app.getName();
     }
@@ -402,4 +412,5 @@ public class Config {
     public static String getConfigFileEnv() {
         return configFileEnv;
     }
+
 }

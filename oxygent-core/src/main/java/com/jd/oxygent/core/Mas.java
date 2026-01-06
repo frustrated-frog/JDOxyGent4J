@@ -718,12 +718,22 @@ public class Mas {
             if (Config.getMessage().isShowInTerminal()) {
                 log.info("--- Send Message ---: {}", body);
             }
-            if (this.redisClient != null && sendMsgKey != null) {
+            boolean isStored = Config.getMessage().isStored();
+            boolean isSend = true;
+            if (body.get("_is_stored") != null && body.get("_is_stored") instanceof Boolean _isStored) {
+                isStored = _isStored;
+                body.remove("_is_stored");
+            }
+            if (body.get("_is_send") != null && body.get("_is_send") instanceof Boolean _isSend) {
+                isSend = isSend;
+                body.remove("_is_send");
+            }
+            if (isSend && this.redisClient != null && sendMsgKey != null) {
                 byte[] messageByte = packMessage(body);
                 String base64 = Base64.getEncoder().encodeToString(messageByte);
                 redisClient.lpush(sendMsgKey, base64);
             }
-            if (Config.getMessage().isStored() && this.esClient != null) {
+            if (isStored && this.esClient != null) {
                 String messageType = body.get("type") != null ? body.getOrDefault("type", "").toString() : body.getOrDefault("message_type", "").toString();
                 Map<String, Object> content = body;
                 if (body.get("content") instanceof Map contentMap && !"todolist".equals(messageType)) {
@@ -734,6 +744,7 @@ public class Mas {
                 messageData.put("trace_id", content.get("current_trace_id"));
                 String nodeId = (String) content.get("node_id");
                 String delta = content.get("delta") != null ? (String) content.get("delta") : "";
+
                 if ("stream_end".equals(messageType) || (nodeId != null && streamDict.get(nodeId) != null && streamDict.get(nodeId).length() % Config.getMessage().getStreamBatchSize() == 0)) {
                     body.put("type", "merged_stream");
                     body.put("node_id", content.get("node_id"));
@@ -885,7 +896,9 @@ public class Mas {
             }
 
             OxyRequest oxyRequest = OxyRequest.builder().mas(this).build();
-
+            if (sendMsgKey == null) {
+                oxyRequest.setSendMessage(false);
+            }
             Set<String> oxyRequestFields = new HashSet<>();
             for (Field field : OxyRequest.class.getDeclaredFields()) {
                 oxyRequestFields.add(field.getName());
@@ -1247,9 +1260,9 @@ public class Mas {
     }
 
     public void clearQueues(String traceId) {
-        if (channelIdDict.get(traceId) != null) {
+        if (traceId != null && channelIdDict.get(traceId) != null) {
             for (String channelId : channelIdDict.get(traceId)) {
-                if (feedbackDict.containsKey(channelId)) {
+                if (channelId != null && feedbackDict.containsKey(channelId)) {
                     feedbackDict.remove(channelId);
                 }
             }
