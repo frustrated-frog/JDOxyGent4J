@@ -37,6 +37,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -173,13 +175,13 @@ public class CommonUtils {
     }
 
     /**
-     * Get current Unix timestamp (in seconds)
-     *
-     * @return Current Unix timestamp string (in seconds)
+     * @return Equivalent to Python's datetime.now().timestamp().
      * @since 1.0.0
      */
-    public static String getTimestamp() {
-        return String.valueOf(Instant.now().getEpochSecond());
+    public static double getTimestamp() {
+        ZonedDateTime localNow = ZonedDateTime.now(ZoneId.systemDefault());
+        Instant instant = localNow.toInstant();
+        return instant.getEpochSecond() + instant.getNano() / 1_000_000_000.0;
     }
 
     /**
@@ -336,12 +338,15 @@ public class CommonUtils {
      * @throws RuntimeException         When image processing fails
      * @since 1.0.0
      */
-    public static String imageToBase64(String source, int maxImagePixels) {
+    public static String imageToBase64(String source, int maxImagePixels, String base64Prefix) {
         if (source == null || source.trim().isEmpty()) {
             throw new IllegalArgumentException("Image source cannot be null or empty string");
         }
         if (maxImagePixels <= 0) {
             throw new IllegalArgumentException("Maximum pixel count must be greater than 0");
+        }
+        if (StringUtils.isBlank(base64Prefix)) {
+            base64Prefix = "data:image";
         }
 
         var imageBytes = sourceToBytes(source);
@@ -373,18 +378,21 @@ public class CommonUtils {
             ImageIO.write(img, format, baos);
             var outputBytes = baos.toByteArray();
 
-            return "data:image;base64," + Base64.getEncoder().encodeToString(outputBytes);
+            return base64Prefix + ";base64," + Base64.getEncoder().encodeToString(outputBytes);
         } catch (Exception e) {
             throw new RuntimeException("Image processing failed: " + source, e);
         }
     }
 
-    public static String videoToBase64(String source, long maxVideoSize) {
+    public static String videoToBase64(String source, long maxVideoSize, String base64Prefix) {
+        if (StringUtils.isBlank(base64Prefix)) {
+            base64Prefix = "data:video";
+        }
         byte[] videoBytes = sourceToBytes(source);
         if (videoBytes.length > maxVideoSize) {
             return source;
         } else {
-            return "data:video;base64," + Base64.getEncoder().encodeToString(videoBytes);
+            return base64Prefix + ";base64," + Base64.getEncoder().encodeToString(videoBytes);
         }
     }
 

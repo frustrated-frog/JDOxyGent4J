@@ -3,6 +3,8 @@ package com.jd.oxygent.core.oxygent.schemas;
 import com.jd.oxygent.core.oxygent.utils.CommonUtils;
 import lombok.Data;
 
+import java.util.Map;
+
 
 /**
  * Simple immutable container representing a Server-Sent Events (SSE) message.
@@ -48,11 +50,12 @@ public class SSEMessage {
      *
      * @return ordered map with string values for SSE transport
      */
-    public java.util.Map<String, String> toSse() {
-        java.util.Map<String, String> sseMap = new java.util.LinkedHashMap<>();
-        sseMap.put("id", this.id);
-        sseMap.put("event", this.event);
-        sseMap.put("data", CommonUtils.toJson(this.data));
+    public static java.util.Map<String, Object> toSse(Map body) {
+        java.util.Map<String, Object> sseMap = new java.util.LinkedHashMap<>();
+        sseMap.put("id", body.get("id"));
+        sseMap.put("event", body.get("event"));
+        sseMap.put("data", body.get("data"));
+        sseMap.put("retry", body.get("retry"));
         return sseMap;
     }
 

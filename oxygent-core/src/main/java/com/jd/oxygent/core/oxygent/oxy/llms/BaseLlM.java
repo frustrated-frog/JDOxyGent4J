@@ -219,6 +219,12 @@ public abstract class BaseLlM extends BaseOxy {
     @Builder.Default
     protected long maxFileSizeBytes = 2 * 1024 * 1024;
 
+    @Builder.Default
+    protected String base64ImagePrefix = "data:image";
+
+    @Builder.Default
+    protected String base64VideoPrefix = "data:video";
+
     /**
      * Preprocess multimodal input messages
      *
@@ -348,11 +354,32 @@ public abstract class BaseLlM extends BaseOxy {
             // Hold URL if conversion is disabled
             if (!isConvertUrlToBase64) {
                 return messagesTemp;
+            } else {
+                for (Message message : messages) {
+                    Object content = message.getContent();
+                    if (!(content instanceof List)) {
+                        continue;
+                    }
+                    List<Map<String, Object>> contentList = (List<Map<String, Object>>) content;
+
+                    for (Map<String, Object> item : contentList) {
+                        String itemType = (String) item.get("type");
+                        if ("text".equals(itemType)) {
+                            continue;
+                        }
+                        if ("image_url".equals(itemType)) {
+                            item.put("url", CommonUtils.imageToBase64(item.get("url").toString(), maxImagePixels, base64ImagePrefix));
+                        } else if ("video_url".equals(itemType)) {
+                            item.put("url", CommonUtils.videoToBase64(item.get("url").toString(), maxVideoSize, base64VideoPrefix));
+                        } else {
+                            logger.warning(String.format("Unexpected content type: %s %s %s", itemType,
+                                    oxyRequest.getCurrentTraceId(),
+                                    oxyRequest.getNodeId()));
+                        }
+                    }
+                }
+                return messagesTemp;
             }
-
-            return messagesTemp;
-
-
         } catch (Exception e) {
             logger.warning("Error processing messages: " + e.getMessage());
             throw new CompletionException(e);

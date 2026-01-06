@@ -563,7 +563,7 @@ public class OxyRequest implements Cloneable {
     public void sendMessage(Map<String, Object> message) {
         if (this.mas != null && message != null && !message.isEmpty()) {
             var redisKey = mas.getMessagePrefix() + ":" + mas.getName() + ":" + this.getCurrentTraceId();
-            this.mas.sendMessage(message, redisKey);
+            this.mas.sendMessage(message, redisKey, this);
         }
     }
 
@@ -851,4 +851,17 @@ public class OxyRequest implements Cloneable {
         this.mas.getGlobalData().put(key, value);
     }
 
+    public Queue<String> getFeedbackStream(String channelId) {
+        if (channelId == null) {
+            channelId = this.currentTraceId;
+        }
+        if (!Mas.feedbackDict.containsKey(channelId)) {
+            Mas.feedbackDict.put(channelId, new LinkedList<>());
+            if (!Mas.channelIdDict.containsKey(currentTraceId)) {
+                Mas.channelIdDict.put(currentTraceId, new LinkedList<>());
+            }
+            Mas.channelIdDict.get(currentTraceId).add(channelId);
+        }
+        return Mas.feedbackDict.get(channelId);
+    }
 }

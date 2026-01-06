@@ -17,6 +17,7 @@ import com.jd.oxygent.core.oxygent.schemas.oxy.OxyResponse;
 import com.jd.oxygent.core.oxygent.utils.ClassModelDumpUtils;
 import com.jd.oxygent.core.oxygent.utils.CommonUtils;
 import com.jd.oxygent.core.oxygent.utils.DataUtils;
+import com.jd.oxygent.core.oxygent.utils.JsonUtils;
 import com.jd.oxygent.web.adapter.FileItemAdapter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -909,5 +910,26 @@ public class RouteController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(WebResponse.error(500, "File upload failed: " + e.getMessage()).toMap());
         }
+    }
+
+    /**
+     * Health check endpoint.
+     *
+     * @return Map returns {"alive": 1} when service is running
+     */
+    @PostMapping("/feedback")
+    public ResponseEntity<Map<String, Object>> feedback(@RequestBody Map<String, String> payload) {
+        String channelId = payload.getOrDefault("channel_id", "");
+//        if (!Mas.feedbackDict.containsKey(channelId)) {
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+//                    .body(WebResponse.error(400, "illegal channel_id: " + channelId).toMap());
+//        }
+        Queue<String> feedbackQueue = Mas.feedbackDict.get(channelId);
+        if (feedbackQueue == null) {
+            feedbackQueue = new LinkedList<>();
+        }
+        String data = payload.getOrDefault("data", "");
+        feedbackQueue.add(data);
+        return ResponseEntity.ok(WebResponse.success(data).toMap());
     }
 }

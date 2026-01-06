@@ -31,6 +31,7 @@ import com.jd.oxygent.core.oxygent.oxy.BaseTool;
 import com.jd.oxygent.core.oxygent.oxy.agents.BaseAgent;
 import com.jd.oxygent.core.oxygent.oxy.agents.RemoteAgent;
 import com.jd.oxygent.core.oxygent.oxy.llms.BaseLlM;
+import com.jd.oxygent.core.oxygent.schemas.SSEMessage;
 import com.jd.oxygent.core.oxygent.schemas.contextengineer.ContextEngine;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyResponse;
@@ -39,6 +40,7 @@ import com.jd.oxygent.core.oxygent.utils.JsonUtils;
 import com.jd.oxygent.core.oxygent.utils.ObjectUtils;
 import com.jd.oxygent.core.oxygent.utils.StringUtils;
 import lombok.AccessLevel;
+import lombok.Builder;
 import lombok.Data;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -55,6 +57,8 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 /**
  * OxyGent Multi-Agent System Core Management Class
@@ -109,6 +113,10 @@ public class Mas {
     private Map<String, Object> activeTasks = new ConcurrentHashMap<>();
     private Set<Object> backgroundTasks = new HashSet<>();
     private Map<String, Object> eventDict = new ConcurrentHashMap<>();
+    private Map<String, StringBuilder> streamDict = new ConcurrentHashMap<>();
+
+    public static Map<String, Queue<String>> feedbackDict = new ConcurrentHashMap<>();
+    public static Map<String, List<String>> channelIdDict = new ConcurrentHashMap<>();
 
     private HttpClient httpClient;
 
@@ -142,6 +150,9 @@ public class Mas {
      */
     @JsonIgnore
     public static Map<Object, Map> queryParamMap = new ConcurrentHashMap();
+
+    @JsonIgnore
+    private BiFunction<Map, OxyRequest, Map> funcProcessMessage;
 
     /**
      * Default constructor, creates a MAS instance named "app"
@@ -379,15 +390,19 @@ public class Mas {
     Map<String, Object> createMessageMapping() {
         Map<String, Object> properties = new HashMap<>();
         properties.put("message_id", Map.of("type", "keyword"));
+        properties.put("group_id", Map.of("type", "keyword"));
         properties.put("trace_id", Map.of("type", "keyword"));
+        properties.put("node_id", Map.of("type", "keyword"));
+        properties.put("node_name", Map.of("type", "keyword"));
         properties.put("message", Map.of("type", "text"));
         properties.put("message_type", Map.of("type", "keyword"));
+        properties.put("message_event", Map.of("type", "keyword"));
+        properties.put("message_timestamp", Map.of("type", "long"));
         properties.put("create_time", Map.of(
                 "type", "date",
                 "format", "yyyy-MM-dd HH:mm:ss.SSSSSSSSS"
         ));
         properties.put("from_trace_id", Map.of("type", "keyword"));
-        properties.put("group_id", Map.of("type", "keyword"));
 
         Map<String, Object> mappings = new HashMap<>();
         mappings.put("properties", properties);
@@ -695,8 +710,11 @@ public class Mas {
         }
     }
 
-    public void sendMessage(Map<String, Object> body, String sendMsgKey) {
+    public void sendMessage(Map<String, Object> body, String sendMsgKey, OxyRequest oxyRequest) {
         try {
+            if (funcProcessMessage != null) {
+                body = funcProcessMessage.apply(body, oxyRequest);
+            }
             if (Config.getMessage().isShowInTerminal()) {
                 log.info("--- Send Message ---: {}", body);
             }
@@ -706,27 +724,45 @@ public class Mas {
                 redisClient.lpush(sendMsgKey, base64);
             }
             if (Config.getMessage().isStored() && this.esClient != null) {
-                String type = body.get("type") != null ? body.getOrDefault("type", "").toString() : body.getOrDefault("message_type", "").toString();
+                String messageType = body.get("type") != null ? body.getOrDefault("type", "").toString() : body.getOrDefault("message_type", "").toString();
                 Map<String, Object> content = body;
-                if (body.get("content") instanceof Map contentMap && !"todolist".equals(type)) {
+                if (body.get("content") instanceof Map contentMap && !"todolist".equals(messageType)) {
                     content = contentMap;
                 }
                 Map<String, Object> messageData = new HashMap<>();
                 messageData.put("message_id", CommonUtils.generateShortUUID(16));
                 messageData.put("trace_id", content.get("current_trace_id"));
-                Map _copy = ObjectUtils.deepCopy(body);
-                removeAbandonedFields(_copy);
-                messageData.put("message", JsonUtils.writeValueAsString(_copy));
-
-                messageData.put("message_type", type);
+                String nodeId = (String) content.get("node_id");
+                String delta = content.get("delta") != null ? (String) content.get("delta") : "";
+                if ("stream_end".equals(messageType) || (nodeId != null && streamDict.get(nodeId) != null && streamDict.get(nodeId).length() % Config.getMessage().getStreamBatchSize() == 0)) {
+                    body.put("type", "merged_stream");
+                    body.put("node_id", content.get("node_id"));
+                    messageData.put("message", streamDict.get(nodeId) != null ? streamDict.get(nodeId).append(delta).toString() : delta);
+                    streamDict.remove(nodeId);
+                } else if ("stream".equals(messageType)) {
+                    if (streamDict.get(nodeId) == null) {
+                        streamDict.put(nodeId, new StringBuilder());
+                    }
+                    streamDict.put(nodeId, streamDict.get(nodeId).append(delta));
+                    return;
+                } else {
+                    Map _copy = ObjectUtils.deepCopy(body);
+                    removeAbandonedFields(_copy);
+                    messageData.put("message", JsonUtils.writeValueAsString(_copy));
+                    messageData.put("body", _copy);
+                }
+                messageData.put("message_type", messageType);
+                messageData.put("message_event", body.get("event"));
+                messageData.put("message_timestamp", body.get("timestamp") != null ? body.get("timestamp") : CommonUtils.getTimestamp());
                 messageData.put("caller", content.get("caller"));
                 messageData.put("callee", content.get("callee"));
                 messageData.put("callee_category", content.get("callee_category"));
                 messageData.put("caller_category", content.get("caller_category"));
                 messageData.put("create_time", CommonUtils.getFormatTime());
                 messageData.put("from_trace_id", content.get("from_trace_id"));
-                messageData.put("group_id", content.get("group_id"));
-                messageData.put("body", _copy);
+                messageData.put("group_id", oxyRequest.getGroupId());
+                messageData.put("node_id", nodeId);
+                messageData.put("node_name", content.get("agent"));
                 esClient.index(Config.getAppName() + "_message", messageData.getOrDefault("message_id", "").toString(), messageData);
             }
         } catch (Exception e) {
@@ -792,8 +828,6 @@ public class Mas {
         if (requestId != null) {
             Mas.firstQuerySet.add(requestId);
             Mas.queryParamMap.put(requestId, payload);
-        } else {
-            log.warn("requestId is null");
         }
 
         Object query = payload.get("query");
@@ -886,9 +920,10 @@ public class Mas {
                 Map<String, Object> message = new HashMap<>();
                 message.put("event", "close");
                 message.put("data", "done");
-                sendMessage(message, sendMsgKey);
+                sendMessage(message, sendMsgKey, oxyRequest);
             }
         } finally {
+            clearQueues(currentTraceId.get());
             currentTraceId.remove();
         }
 
@@ -1207,6 +1242,16 @@ public class Mas {
             if (!"tool_call".equals(_copy.get("type")) || requestId == null || !Mas.firstQuerySet.contains(requestId)) {
                 _sharedData.remove("files");
                 _sharedData.remove("first_query_struct");
+            }
+        }
+    }
+
+    public void clearQueues(String traceId) {
+        if (channelIdDict.get(traceId) != null) {
+            for (String channelId : channelIdDict.get(traceId)) {
+                if (feedbackDict.containsKey(channelId)) {
+                    feedbackDict.remove(channelId);
+                }
             }
         }
     }

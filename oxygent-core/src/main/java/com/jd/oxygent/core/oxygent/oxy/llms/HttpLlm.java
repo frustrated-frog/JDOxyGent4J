@@ -267,7 +267,7 @@ public class HttpLlm extends RemoteLlm {
 
             String line;
             while ((line = reader.readLine()) != null) {
-                if (line.startsWith("data: ")) {
+                if (line.startsWith("data:")) {
                     String jsonData = line.substring(6).trim();
 
                     if (jsonData.isEmpty() || "[DONE]".equals(jsonData)) {
@@ -286,9 +286,7 @@ public class HttpLlm extends RemoteLlm {
                             contentMap.put("delta", content);
                             contentMap.put("agent", oxyRequest.getCaller());
                             contentMap.put("node_id", oxyRequest.getNodeId());
-                            contentMap.put("current_trace_id", oxyRequest.getCurrentTraceId());
                             streamMessage.put("content", contentMap);
-                            streamMessage.put("_is_stored", false);
 
                             oxyRequest.sendMessage(streamMessage);
                         }
@@ -311,10 +309,7 @@ public class HttpLlm extends RemoteLlm {
                                 contentMap.put("delta", content);
                                 contentMap.put("agent", oxyRequest.getCaller());
                                 contentMap.put("node_id", oxyRequest.getNodeId());
-                                contentMap.put("current_trace_id", oxyRequest.getCurrentTraceId());
                                 streamMessage.put("content", contentMap);
-                                streamMessage.put("_is_stored", false);
-
                                 oxyRequest.sendMessage(streamMessage);
                             }
                         }
@@ -327,6 +322,13 @@ public class HttpLlm extends RemoteLlm {
             logger.error("Error reading streaming response", e);
             throw new RuntimeException("Failed to read streaming response", e);
         }
+
+        Map<String, Object> streamMessage = new HashMap<>();
+        streamMessage.put("type", "stream_end");
+        streamMessage.put("delta", "");
+        streamMessage.put("agent", oxyRequest.getCaller());
+        streamMessage.put("node_id", oxyRequest.getNodeId());
+        oxyRequest.sendMessage(streamMessage);
 
         OxyResponse oxyResponse = new OxyResponse();
         oxyResponse.setOutput(result.toString());

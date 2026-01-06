@@ -284,6 +284,7 @@ public class Config {
         private boolean isStored = true;
         private boolean isShowInTerminal = false;
         private boolean isSendFullArguments = false;
+        private Integer streamBatchSize = 256;
     }
 
     @Data

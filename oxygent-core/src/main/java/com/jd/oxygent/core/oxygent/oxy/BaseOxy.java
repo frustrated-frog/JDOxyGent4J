@@ -157,6 +157,10 @@ public class BaseOxy {
     private Function<OxyRequest, String> funcInterceptor;
 
     @JsonIgnore
+    @Builder.Default
+    private Function<OxyRequest, OxyRequest> funcProcessMessage = Function.identity();
+
+    @JsonIgnore
     protected Mas mas;
 
     @JsonProperty("friendly_error_text")

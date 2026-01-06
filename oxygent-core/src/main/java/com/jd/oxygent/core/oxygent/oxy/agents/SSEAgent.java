@@ -31,6 +31,7 @@ import reactor.core.publisher.Flux;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -181,6 +182,23 @@ public class SSEAgent extends RemoteAgent {
      */
     @Builder.Default
     protected long retryDelayMs = 1000;
+
+    public static final List EXCLUDED_HEADERS = List.of(
+            "host",
+            "connection",
+            "sec-ch-ua",
+            "sec-ch-ua-mobile",
+            "sec-ch-ua-platform",
+            "user-agent",
+            "referer",
+            "accept-encoding",
+            "accept-language",
+            "cache-control",
+            "sec-fetch-site",
+            "sec-fetch-mode",
+            "sec-fetch-dest",
+            "accept",
+            "content-length");
 
     /**
      * WebClient instance
@@ -338,8 +356,14 @@ public class SSEAgent extends RemoteAgent {
                     payload.put("node_id_stack", nodeIdStack.subList(0, nodeIdStack.size() - 1));
                 }
             } else {
+                payload.remove("call_stack");
+                payload.remove("node_id_stack");
                 // When not sharing call stack, set caller to user
                 payload.put("caller", "user");
+            }
+            payload.remove("arguments");
+            if (payload.get("shared_data") != null && payload.get("shared_data") instanceof Map sharedDataMap && sharedDataMap.containsKey("_headers")) {
+                sharedDataMap.remove("_headers");
             }
 
             // === Step 3: Use WebClient to handle SSE stream ===
@@ -358,10 +382,13 @@ public class SSEAgent extends RemoteAgent {
                     .accept(MediaType.TEXT_EVENT_STREAM)         // Accept SSE stream
                     .bodyValue(payload);                         // Send constructed payload
 
+
             // Add custom HTTP headers
             if (customHeaders != null && !customHeaders.isEmpty()) {
                 for (Map.Entry<String, String> header : customHeaders.entrySet()) {
-                    requestSpec = requestSpec.header(header.getKey(), header.getValue());
+                    if (EXCLUDED_HEADERS.contains(header.getKey())) {
+                        requestSpec = requestSpec.header(header.getKey(), header.getValue());
+                    }
                 }
                 log.debug("Added {} custom headers to SSE request", customHeaders.size());
             }

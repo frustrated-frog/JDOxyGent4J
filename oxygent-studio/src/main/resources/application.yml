@@ -39,6 +39,7 @@ oxygent:
     send-think: true
     send-answer: true
     stored: true
+    stream-batch-size: 256
     show-in-terminal: true
     send-full-arguments: false
 
