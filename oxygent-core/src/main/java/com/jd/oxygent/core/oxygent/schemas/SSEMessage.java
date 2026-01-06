@@ -17,19 +17,18 @@ import java.util.Map;
 @Data
 public class SSEMessage {
     /** Unique identifier for the message (generated automatically). */
-    private final String id;
+    private String id = CommonUtils.generateShortUUID();
     /** Event type/name (defaults to "message"). */
-    private final String event;
+    private String event = "message";
     /** Event payload. May be any object serializable by CommonUtils. */
-    private final Object data;
+    private Map data = null;
+    /** Retry interval ms (defaults to 3000). */
+    private Integer retry = 3000;
 
     /**
      * Creates an SSEMessage with default event name "message" and empty payload.
      */
     public SSEMessage() {
-        this.id = CommonUtils.generateShortUUID();
-        this.event = "message";
-        this.data = "";
     }
 
     /**
@@ -38,10 +37,9 @@ public class SSEMessage {
      * @param event event name; if {@code null} the value defaults to "message"
      * @param data  event payload; if {@code null} the value defaults to an empty string
      */
-    public SSEMessage(String event, Object data) {
-        this.id = CommonUtils.generateShortUUID();
+    public SSEMessage(String event, Map data) {
         this.event = event != null ? event : "message";
-        this.data = data != null ? data : "";
+        this.data = data;
     }
 
     /**

@@ -91,7 +91,7 @@ public class DemoHumanInTheLoop {
     private static String workflow(OxyRequest oxyRequest) {
         oxyRequest.sendMessage(Map.of("type", "msg_type", "content", "msg_content"));
         StringBuilder feedbacks = new StringBuilder();
-        String url = "http://localhost:8080/feedback";
+        String url = "http://localhost:8888/feedback";
         String jsonBody = """
             {"channel_id": "my_custom_channel_id", "data": "my_custom_feedback"}
             """;
@@ -111,7 +111,7 @@ public class DemoHumanInTheLoop {
             try (BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(inputStream, "UTF-8"))) {
                 String line = null;
                 while ((line = reader.readLine()) != null) {
-                    feedbacks.append(line);
+                    feedbacks.append(line + "\n");
                 }
             } catch (IOException e) {
                 log.error("Error reading streaming response", e);

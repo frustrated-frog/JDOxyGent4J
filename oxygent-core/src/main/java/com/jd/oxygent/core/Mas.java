@@ -16,7 +16,6 @@
 
 package com.jd.oxygent.core;
 
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -151,8 +150,17 @@ public class Mas {
     @JsonIgnore
     public static Map<Object, Map> queryParamMap = new ConcurrentHashMap();
 
+    /**
+     * function customization and message processing
+     */
     @JsonIgnore
     private BiFunction<Map, OxyRequest, Map> funcProcessMessage;
+
+    /**
+     * function customization and message body processing
+     */
+    @JsonIgnore
+    private Function<Map, Map> funcProcessMessageBody;
 
     /**
      * Default constructor, creates a MAS instance named "app"
@@ -739,16 +747,28 @@ public class Mas {
                 if (body.get("content") instanceof Map contentMap && !"todolist".equals(messageType)) {
                     content = contentMap;
                 }
-                Map<String, Object> messageData = new HashMap<>();
-                messageData.put("message_id", CommonUtils.generateShortUUID(16));
-                messageData.put("trace_id", content.get("current_trace_id"));
                 String nodeId = (String) content.get("node_id");
                 String delta = content.get("delta") != null ? (String) content.get("delta") : "";
 
-                if ("stream_end".equals(messageType) || (nodeId != null && streamDict.get(nodeId) != null && streamDict.get(nodeId).length() % Config.getMessage().getStreamBatchSize() == 0)) {
+                if ("stream_end".equals(messageType) || (nodeId != null && streamDict.get(nodeId) != null && streamDict.get(nodeId).length() >= Config.getMessage().getStreamBatchSize())) {
                     body.put("type", "merged_stream");
                     body.put("node_id", content.get("node_id"));
-                    messageData.put("message", streamDict.get(nodeId) != null ? streamDict.get(nodeId).append(delta).toString() : delta);
+
+                    Map<String, Object> streamMessageData = new HashMap<>();
+                    streamMessageData.put("message_id", CommonUtils.generateShortUUID(16));
+                    streamMessageData.put("group_id", oxyRequest.getGroupId());
+                    streamMessageData.put("trace_id", currentTraceId.get());
+                    streamMessageData.put("node_id", nodeId);
+                    streamMessageData.put("node_name", content.get("agent"));
+                    Map<String, String> streamMessageBody = new HashMap<>();
+                    streamMessageBody.put("type", "merged_stream");
+                    streamMessageBody.put("content", streamDict.get(nodeId) != null ? streamDict.get(nodeId).append(delta).toString() : delta);
+                    streamMessageData.put("message", JsonUtils.toJSONString(streamMessageBody));
+                    streamMessageData.put("message_type", "merged_stream");
+                    streamMessageData.put("message_event", null); // FIXME sse_message.event
+                    streamMessageData.put("message_timestamp", body.get("timestamp") != null ? body.get("timestamp") : CommonUtils.getTimestamp());
+                    streamMessageData.put("create_time", CommonUtils.getFormatTime());
+                    esClient.index(Config.getAppName() + "_message", streamMessageData.get("message_id").toString(), streamMessageData);
                     streamDict.remove(nodeId);
                 } else if ("stream".equals(messageType)) {
                     if (streamDict.get(nodeId) == null) {
@@ -758,23 +778,30 @@ public class Mas {
                     return;
                 } else {
                     Map _copy = ObjectUtils.deepCopy(body);
-                    removeAbandonedFields(_copy);
-                    messageData.put("message", JsonUtils.writeValueAsString(_copy));
-                    messageData.put("body", _copy);
+                    if (funcProcessMessageBody != null) {
+                        _copy = funcProcessMessageBody.apply(_copy);
+                    } else {
+                        removeAbandonedFields(_copy);
+                    }
+                    Map<String, Object> nonStreamMessageData = new HashMap<>();
+                    nonStreamMessageData.put("message_id", CommonUtils.generateShortUUID(16)); // FIXME sse_message.id
+                    nonStreamMessageData.put("group_id", oxyRequest.getGroupId());
+                    nonStreamMessageData.put("trace_id", currentTraceId.get());
+                    nonStreamMessageData.put("node_id", nodeId);
+                    nonStreamMessageData.put("node_name", content.get("agent"));
+                    nonStreamMessageData.put("message", JsonUtils.writeValueAsString(_copy));
+                    nonStreamMessageData.put("message_type", messageType);
+                    nonStreamMessageData.put("message_event", null); // FIXME sse_message.event
+                    nonStreamMessageData.put("message_timestamp", body.get("timestamp") != null ? body.get("timestamp") : CommonUtils.getTimestamp());
+                    nonStreamMessageData.put("create_time", CommonUtils.getFormatTime());
+                    nonStreamMessageData.put("from_trace_id", content.get("from_trace_id"));
+                    nonStreamMessageData.put("caller", content.get("caller"));
+                    nonStreamMessageData.put("callee", content.get("callee"));
+                    nonStreamMessageData.put("callee_category", content.get("callee_category"));
+                    nonStreamMessageData.put("caller_category", content.get("caller_category"));
+                    nonStreamMessageData.put("body", _copy);
+                    esClient.index(Config.getAppName() + "_message", nonStreamMessageData.getOrDefault("message_id", "").toString(), nonStreamMessageData);
                 }
-                messageData.put("message_type", messageType);
-                messageData.put("message_event", body.get("event"));
-                messageData.put("message_timestamp", body.get("timestamp") != null ? body.get("timestamp") : CommonUtils.getTimestamp());
-                messageData.put("caller", content.get("caller"));
-                messageData.put("callee", content.get("callee"));
-                messageData.put("callee_category", content.get("callee_category"));
-                messageData.put("caller_category", content.get("caller_category"));
-                messageData.put("create_time", CommonUtils.getFormatTime());
-                messageData.put("from_trace_id", content.get("from_trace_id"));
-                messageData.put("group_id", oxyRequest.getGroupId());
-                messageData.put("node_id", nodeId);
-                messageData.put("node_name", content.get("agent"));
-                esClient.index(Config.getAppName() + "_message", messageData.getOrDefault("message_id", "").toString(), messageData);
             }
         } catch (Exception e) {
             log.error("Failed to send message", e);

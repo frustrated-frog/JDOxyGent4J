@@ -64,6 +64,7 @@ public final class ServerConstants {
         this.put("/view", "RouteServlet");
         this.put("/call", "RouteServlet");
         this.put("/upload", "RouteServlet");
+        this.put("/feedback", "RouteServlet");
     }};
     public static final List<String> WEBAPP_RESOURCE_DIR_PATHS = List.of(
             "webapp",

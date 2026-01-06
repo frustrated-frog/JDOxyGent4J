@@ -913,9 +913,9 @@ public class RouteController {
     }
 
     /**
-     * Health check endpoint.
+     * feedback
      *
-     * @return Map returns {"alive": 1} when service is running
+     * @return Mas.feedbackDict.get(channelId)
      */
     @PostMapping("/feedback")
     public ResponseEntity<Map<String, Object>> feedback(@RequestBody Map<String, String> payload) {

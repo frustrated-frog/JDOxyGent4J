@@ -29,6 +29,7 @@ import com.jd.oxygent.core.oxygent.schemas.memory.Memory;
 import com.jd.oxygent.core.oxygent.schemas.memory.Message;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyResponse;
+import com.jd.oxygent.core.oxygent.schemas.oxy.OxyState;
 import com.jd.oxygent.core.oxygent.utils.ClassModelDumpUtils;
 import com.jd.oxygent.core.oxygent.utils.CommonUtils;
 import com.jd.oxygent.core.oxygent.utils.DataUtils;
@@ -43,6 +44,9 @@ import org.apache.tomcat.util.http.fileupload.FileUpload;
 import org.apache.tomcat.util.http.fileupload.FileUploadBase;
 import org.apache.tomcat.util.http.fileupload.disk.DiskFileItemFactory;
 import org.apache.tomcat.util.http.fileupload.servlet.ServletRequestContext;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -75,7 +79,7 @@ import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.*;
 @WebServlet(name = "RouteServlet", urlPatterns = {
         "/", "/check_alive", "/get_organization", "/get_first_query",
         "/get_welcome_message", "/list_script", "/save_script", "/load_script",
-        "/chat", "/sse/chat", "/async/chat", "/node", "/view", "/call", "/upload"
+        "/chat", "/sse/chat", "/async/chat", "/node", "/view", "/call", "/upload", "/feedback"
 }, loadOnStartup = 1)
 public class RouteServlet extends HttpServlet {
 
@@ -147,6 +151,9 @@ public class RouteServlet extends HttpServlet {
                     break;
                 case "/upload":
                     handleUploadFile(request, response);
+                    break;
+                case "/feedback":
+                    handleFeedback(request, response);
                     break;
                 default:
                     response.sendError(HttpServletResponse.SC_NOT_FOUND, "Path not found: " + path);
@@ -507,6 +514,22 @@ public class RouteServlet extends HttpServlet {
             log.error("SSE chat failed", e);
             response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "SSE chat failed: " + e.getMessage());
         }
+    }
+
+    private void handleFeedback(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Map<String, Object> payload = readRequestBody(request);
+        String channelId = (String) payload.getOrDefault("channel_id", "");
+//        if (!Mas.feedbackDict.containsKey(channelId)) {
+//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+//                    .body(WebResponse.error(400, "illegal channel_id: " + channelId).toMap());
+//        }
+        Queue<String> feedbackQueue = Mas.feedbackDict.get(channelId);
+        if (feedbackQueue == null) {
+            feedbackQueue = new LinkedList<>();
+        }
+        String data = (String) payload.getOrDefault("data", "");
+        feedbackQueue.add(data);
+        sendSseEvent(response, "message", feedbackQueue);
     }
 
     /**
