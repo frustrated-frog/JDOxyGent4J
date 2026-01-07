@@ -10,6 +10,7 @@ import com.jd.oxygent.core.oxygent.samples.server.masprovider.MasFactoryRegistry
 import com.jd.oxygent.core.oxygent.samples.server.utils.FileValidationUtil;
 import com.jd.oxygent.core.oxygent.samples.server.utils.RecursivePackageInstantiator;
 import com.jd.oxygent.core.oxygent.samples.server.vo.*;
+import com.jd.oxygent.core.oxygent.schemas.SSEMessage;
 import com.jd.oxygent.core.oxygent.schemas.memory.Memory;
 import com.jd.oxygent.core.oxygent.schemas.memory.Message;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
@@ -39,6 +40,8 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -133,7 +136,7 @@ public class RouteController {
     @GetMapping("/get_first_query")
     public ResponseEntity<Map<String, Object>> getFirstQuery() {
         try {
-            String firstQuery = mas.getFirstQuery() != null && !mas.getFirstQuery().isEmpty() ? mas.getFirstQuery() : config.getServer().getFirstQuery();
+            String firstQuery = mas.getFirstQuery() != null && !mas.getFirstQuery().isEmpty() ? mas.getFirstQuery() : Config.getServer().getFirstQuery();
             Map<String, Object> data = Map.of("first_query", firstQuery);
             return ResponseEntity.ok(WebResponse.success(data).toMap());
         } catch (Exception e) {
@@ -151,7 +154,7 @@ public class RouteController {
     @GetMapping("/get_welcome_message")
     public ResponseEntity<Map<String, Object>> getWelcomeMessage() {
         try {
-            String welcomeMessage = config.getServer().getWelcomeMessage() != null ? config.getServer().getWelcomeMessage() : "";
+            String welcomeMessage = Config.getServer().getWelcomeMessage() != null ? Config.getServer().getWelcomeMessage() : "";
             Map<String, Object> data = Map.of("welcome_message", welcomeMessage);
             return ResponseEntity.ok(WebResponse.success(data).toMap());
         } catch (Exception e) {
@@ -169,7 +172,7 @@ public class RouteController {
     @GetMapping("/list_script")
     public ResponseEntity<Map<String, Object>> listScript() {
         try {
-            String scriptSaveDir = Paths.get(config.getXfile().getSaveDir(), "script").toString();
+            String scriptSaveDir = Paths.get(Config.getXfile().getSaveDir(), "script").toString();
             Files.createDirectories(Paths.get(scriptSaveDir));
 
             File dir = new File(scriptSaveDir);
@@ -201,7 +204,7 @@ public class RouteController {
     @PostMapping("/save_script")
     public ResponseEntity<Map<String, Object>> saveScript(@RequestBody ScriptRequest script) {
         try {
-            String scriptSaveDir = Paths.get(config.getXfile().getSaveDir(), "script").toString();
+            String scriptSaveDir = Paths.get(Config.getXfile().getSaveDir(), "script").toString();
             Files.createDirectories(Paths.get(scriptSaveDir));
 
             Path filePath = Paths.get(scriptSaveDir, script.getName() + ".json");
@@ -227,7 +230,7 @@ public class RouteController {
     @GetMapping("/load_script")
     public ResponseEntity<Map<String, Object>> loadScript(@RequestParam("item_id") String itemId) {
         try {
-            String scriptSaveDir = Paths.get(config.getXfile().getSaveDir(), "script").toString();
+            String scriptSaveDir = Paths.get(Config.getXfile().getSaveDir(), "script").toString();
             Path jsonPath = Paths.get(scriptSaveDir, itemId + ".json");
 
             if (!Files.exists(jsonPath)) {
@@ -302,7 +305,7 @@ public class RouteController {
 
             for (String attachment : attachments) {
                 boolean isRemote = attachment.startsWith("http://") || attachment.startsWith("https://");
-                String filePath = isRemote ? attachment : config.getXfile().getSaveDir() + "/uploads/" + attachment;
+                String filePath = isRemote ? attachment : Config.getXfile().getSaveDir() + "/uploads/" + attachment;
                 attachmentsWithPath.add(filePath);
                 if (isRemote) {
                     remoteUrls.add(filePath);
@@ -526,16 +529,9 @@ public class RouteController {
                 }
 
                 // Unpack message
-                Map<String, Object> msgMap = mas.unpackMessage(Base64.getDecoder().decode((String) rpop));
-                if (msgMap != null) {
-                    // Check for close event
-                    if (msgMap.containsKey("event")) {
-                        emitter.send(SseEmitter.event().data(msgMap).name((String) msgMap.get("event")));
-                        log.info("SSE connection terminated. trace_id: {}", currentTraceId);
-                        emitter.complete();
-                        break;
-                    }
-
+                SSEMessage<Map<String, Object>> sseMessage = mas.unpackMessage(Base64.getDecoder().decode((String) rpop));
+                if (sseMessage != null && sseMessage.getData() != null) {
+                    Map<String, Object> msgMap = sseMessage.getData();
                     // Handle tool_call message
                     if ("tool_call".equals(msgMap.get("type"))) {
                         Map<String, Object> content = (Map<String, Object>) msgMap.get("content");
@@ -552,7 +548,6 @@ public class RouteController {
                             }
                         }
                     }
-
                     // Handle observation message
                     if ("observation".equals(msgMap.get("type"))) {
                         Map<String, Object> content = (Map<String, Object>) msgMap.get("content");
@@ -560,9 +555,14 @@ public class RouteController {
                             content.put("output", CommonUtils.toJson(content.get("output")));
                         }
                     }
+                    emitter.send(SseEmitter.event().data(msgMap).name(sseMessage.getEvent()));
+                    // Check for close event
+                    if ("close".equals(sseMessage.getEvent())) {
+                        log.info("SSE connection terminated. trace_id: {}", currentTraceId);
+                        emitter.complete();
+                        break;
+                    }
                 }
-                // Send message
-                emitter.send(SseEmitter.event().data(msgMap).name("message"));
             }
         } catch (InterruptedException e) {
             log.info("SSE connection terminated. trace_id: {}", currentTraceId);
@@ -920,16 +920,22 @@ public class RouteController {
     @PostMapping("/feedback")
     public ResponseEntity<Map<String, Object>> feedback(@RequestBody Map<String, String> payload) {
         String channelId = payload.getOrDefault("channel_id", "");
-//        if (!Mas.feedbackDict.containsKey(channelId)) {
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-//                    .body(WebResponse.error(400, "illegal channel_id: " + channelId).toMap());
-//        }
-        Queue<String> feedbackQueue = Mas.feedbackDict.get(channelId);
-        if (feedbackQueue == null) {
-            feedbackQueue = new LinkedList<>();
+        if (!Mas.feedbackDict.containsKey(channelId)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(WebResponse.error(HttpStatus.BAD_REQUEST.value(), "illegal channel_id: " + channelId).toMap());
         }
+        LinkedBlockingQueue<String> feedbackQueue = Mas.feedbackDict.get(channelId);
         String data = payload.getOrDefault("data", "");
-        feedbackQueue.add(data);
-        return ResponseEntity.ok(WebResponse.success(data).toMap());
+        if (feedbackQueue == null) {
+            feedbackQueue = new LinkedBlockingQueue<>();
+            Mas.feedbackDict.put(channelId, feedbackQueue);
+        }
+        try {
+            feedbackQueue.put(data);
+            feedbackQueue.put("");
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        return ResponseEntity.ok(WebResponse.success("success").toMap());
     }
 }

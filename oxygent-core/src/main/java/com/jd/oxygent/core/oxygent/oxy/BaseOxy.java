@@ -527,7 +527,13 @@ public class BaseOxy {
             content.put("caller_category", oxyRequest.getCallerCategory());
             content.put("callee_category", oxyRequest.getCalleeCategory());
             content.put("call_stack", oxyRequest.getCallStack());
-            content.put("arguments", oxyRequest.getArguments());
+            if (oxyRequest.getArguments() != null) {
+                if (Config.getMessage().isSendFullArguments()) {
+                    content.put("arguments", oxyRequest.getArguments());
+                } else if (oxyRequest.getArguments().get("query") != null) {
+                    content.put("arguments", Map.of("query", oxyRequest.getArguments().get("query")));
+                }
+            }
             content.put("request_id", oxyRequest.getRequestId());
             content.put("current_trace_id", oxyRequest.getCurrentTraceId());
             content.put("from_trace_id", oxyRequest.getFromTraceId());
@@ -640,7 +646,6 @@ public class BaseOxy {
             content.put("from_trace_id", oxyRequest.getFromTraceId());
             content.put("group_id", oxyRequest.getGroupId());
             message.put("content", content);
-
             oxyRequest.sendMessage(message);
         }
         if (isSendAnswer && "user".equals(oxyRequest.getCallerCategory())) {

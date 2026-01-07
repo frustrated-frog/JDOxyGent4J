@@ -21,7 +21,9 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import com.jd.oxygent.core.Config;
 import com.jd.oxygent.core.Mas;
 import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
+import com.jd.oxygent.core.oxygent.schemas.SSEMessage;
 import com.jd.oxygent.core.oxygent.utils.JsonUtils;
+import com.jd.oxygent.core.oxygent.utils.StringUtils;
 import lombok.*;
 
 import java.lang.reflect.Field;
@@ -29,6 +31,9 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -572,17 +577,29 @@ public class OxyRequest implements Cloneable {
      * <p>Send message to Redis queue for inter-system communication. Messages are routed
      * to corresponding processing queues based on current trace ID.</p>
      *
-     * @param message message content to send, cannot be null or empty
+     * @param sseMessage message content to send, cannot be null or empty
      */
-    public void sendMessage(Map<String, Object> message) {
-        if (isSendMessage && this.mas != null && message != null && !message.isEmpty()) {
+    public void sendMessage(SSEMessage sseMessage) {
+        if (isSendMessage && this.mas != null && sseMessage != null && sseMessage.getData() != null) {
             var redisKey = mas.getMessagePrefix() + ":" + mas.getName() + ":" + this.getCurrentTraceId();
-            this.mas.sendMessage(message, redisKey, this);
+            this.mas.sendMessage(sseMessage, redisKey, this);
         }
     }
 
+    /**
+     * Send message to current MAS system
+     *
+     * <p>Send message to Redis queue for inter-system communication. Messages are routed
+     * to corresponding processing queues based on current trace ID.</p>
+     *
+     * @param message message content to send, cannot be null or empty
+     */
+    public void sendMessage(Map<String, Object> message) {
+        this.sendMessage(new SSEMessage((String) message.get("event"), message));
+    }
+
     public void breakTask() {
-        this.sendMessage(Map.of("event", "close", "data", "done"));
+        this.sendMessage(new SSEMessage("close", Map.of("event", "close", "data", "done")));
         CompletableFuture<?> completableFuture = (CompletableFuture<?>) this.mas.getActiveTasks().get(this.getCurrentTraceId());
         if (completableFuture != null) {
             completableFuture.cancel(true);
@@ -865,17 +882,39 @@ public class OxyRequest implements Cloneable {
         this.mas.getGlobalData().put(key, value);
     }
 
-    public Queue<String> getFeedbackStream(String channelId) {
+    public void initFeedbackStream(String channelId) {
         if (channelId == null) {
             channelId = this.currentTraceId;
         }
         if (!Mas.feedbackDict.containsKey(channelId)) {
-            Mas.feedbackDict.put(channelId, new LinkedList<>());
+            Mas.feedbackDict.put(channelId, new LinkedBlockingQueue<>());
             if (!Mas.channelIdDict.containsKey(currentTraceId)) {
                 Mas.channelIdDict.put(currentTraceId, new LinkedList<>());
             }
             Mas.channelIdDict.get(currentTraceId).add(channelId);
         }
-        return Mas.feedbackDict.get(channelId);
+    }
+
+    /**
+     * blocking get feedback stream
+     * @param finalChannelId
+     * @return
+     */
+    public String getFeedbackStream(final String finalChannelId) {
+        try {
+            LinkedBlockingQueue<String> feedbackQueue = Mas.feedbackDict.get(finalChannelId);
+            StringBuilder feedback = new StringBuilder();
+            String temp = null;
+            while (true) {
+                temp = feedbackQueue.take(); // blocking get
+                if ("".equals(temp)) { // stream end symbol
+                    return feedback.toString();
+                } else {
+                    feedback.append(temp);
+                }
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

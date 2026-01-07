@@ -25,6 +25,7 @@ import com.jd.oxygent.core.oxygent.samples.server.masprovider.MasFactoryRegistry
 import com.jd.oxygent.core.oxygent.samples.server.utils.FileValidationUtil;
 import com.jd.oxygent.core.oxygent.samples.server.utils.RecursivePackageInstantiator;
 import com.jd.oxygent.core.oxygent.samples.server.vo.*;
+import com.jd.oxygent.core.oxygent.schemas.SSEMessage;
 import com.jd.oxygent.core.oxygent.schemas.memory.Memory;
 import com.jd.oxygent.core.oxygent.schemas.memory.Message;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
@@ -44,6 +45,7 @@ import org.apache.tomcat.util.http.fileupload.FileUpload;
 import org.apache.tomcat.util.http.fileupload.FileUploadBase;
 import org.apache.tomcat.util.http.fileupload.disk.DiskFileItemFactory;
 import org.apache.tomcat.util.http.fileupload.servlet.ServletRequestContext;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -60,6 +62,9 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -516,20 +521,31 @@ public class RouteServlet extends HttpServlet {
         }
     }
 
+    /**
+     * Feedback interface
+     * @param request
+     * @param response
+     * @throws IOException
+     */
     private void handleFeedback(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Map<String, Object> payload = readRequestBody(request);
         String channelId = (String) payload.getOrDefault("channel_id", "");
-//        if (!Mas.feedbackDict.containsKey(channelId)) {
-//            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-//                    .body(WebResponse.error(400, "illegal channel_id: " + channelId).toMap());
-//        }
-        Queue<String> feedbackQueue = Mas.feedbackDict.get(channelId);
-        if (feedbackQueue == null) {
-            feedbackQueue = new LinkedList<>();
+        if (!Mas.feedbackDict.containsKey(channelId)) {
+            sendSseEvent(response, "error", Map.of("error", "illegal channel_id: " + channelId));
         }
+        LinkedBlockingQueue<String> feedbackQueue = Mas.feedbackDict.get(channelId);
         String data = (String) payload.getOrDefault("data", "");
-        feedbackQueue.add(data);
-        sendSseEvent(response, "message", feedbackQueue);
+        if (feedbackQueue == null) {
+            feedbackQueue = new LinkedBlockingQueue<>();
+            Mas.feedbackDict.put(channelId, feedbackQueue);
+        }
+        try {
+            feedbackQueue.put(data);
+            feedbackQueue.put(""); // stream end symbol
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        sendSseEvent(response, "message", "success");
     }
 
     /**
@@ -950,7 +966,7 @@ public class RouteServlet extends HttpServlet {
                              HttpServletResponse response) throws Exception {
         try {
             while (true) {
-                // Read message from Redis
+                // Read message from Redis, Polling to prevent latency
                 Object rpop = mas.getRedisClient().brpop(redisKey);
                 if (rpop == null) {
                     Thread.sleep(100);
@@ -958,8 +974,9 @@ public class RouteServlet extends HttpServlet {
                 }
 
                 // Unpack message
-                Map<String, Object> msgMap = mas.unpackMessage(Base64.getDecoder().decode((String) rpop));
-                if (msgMap != null) {
+                SSEMessage<Map<String, Object>> sseMessage = mas.unpackMessage(Base64.getDecoder().decode((String) rpop));
+                if (sseMessage != null && sseMessage.getData() != null) {
+                    Map<String, Object> msgMap = sseMessage.getData();
                     // Check if it is a close event
                     if (msgMap.containsKey("event")) {
                         sendSseEvent(response, (String) msgMap.get("event"), msgMap);
@@ -991,9 +1008,9 @@ public class RouteServlet extends HttpServlet {
                             content.put("output", CommonUtils.toJson(content.get("output")));
                         }
                     }
+                    // Send message
+                    sendSseEvent(response, "message", msgMap);
                 }
-                // Send message
-                sendSseEvent(response, "message", msgMap);
             }
         } catch (InterruptedException e) {
             log.info("SSE connection terminated。trace_id: {}", currentTraceId);

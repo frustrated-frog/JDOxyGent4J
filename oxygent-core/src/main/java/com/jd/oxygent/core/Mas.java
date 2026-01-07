@@ -43,6 +43,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.compress.utils.Lists;
 import org.msgpack.core.MessagePack;
 import org.msgpack.jackson.dataformat.MessagePackFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -112,10 +113,16 @@ public class Mas {
     private Map<String, Object> activeTasks = new ConcurrentHashMap<>();
     private Set<Object> backgroundTasks = new HashSet<>();
     private Map<String, Object> eventDict = new ConcurrentHashMap<>();
-    private Map<String, StringBuilder> streamDict = new ConcurrentHashMap<>();
+    private Map<String, List<String>> streamDict = new ConcurrentHashMap<>();
 
-    public static Map<String, Queue<String>> feedbackDict = new ConcurrentHashMap<>();
+    /**
+     * feedback channel_id
+     */
     public static Map<String, List<String>> channelIdDict = new ConcurrentHashMap<>();
+    /**
+     * feedback blocking queue
+     */
+    public static Map<String, LinkedBlockingQueue<String>> feedbackDict = new ConcurrentHashMap<>();
 
     private HttpClient httpClient;
 
@@ -718,13 +725,14 @@ public class Mas {
         }
     }
 
-    public void sendMessage(Map<String, Object> body, String sendMsgKey, OxyRequest oxyRequest) {
+    public void sendMessage(SSEMessage<Map<String, Object>> sseMessage, String sendMsgKey, OxyRequest oxyRequest) {
+        Map<String, Object> body = sseMessage.getData();
         try {
             if (funcProcessMessage != null) {
                 body = funcProcessMessage.apply(body, oxyRequest);
             }
             if (Config.getMessage().isShowInTerminal()) {
-                log.info("--- Send Message ---: {}", body);
+                log.info("--- Send Message ---: {}", JsonUtils.toJSONString(sseMessage));
             }
             boolean isStored = Config.getMessage().isStored();
             boolean isSend = true;
@@ -737,7 +745,7 @@ public class Mas {
                 body.remove("_is_send");
             }
             if (isSend && this.redisClient != null && sendMsgKey != null) {
-                byte[] messageByte = packMessage(body);
+                byte[] messageByte = packMessage(sseMessage);
                 String base64 = Base64.getEncoder().encodeToString(messageByte);
                 redisClient.lpush(sendMsgKey, base64);
             }
@@ -749,33 +757,32 @@ public class Mas {
                 }
                 String nodeId = (String) content.get("node_id");
                 String delta = content.get("delta") != null ? (String) content.get("delta") : "";
-
-                if ("stream_end".equals(messageType) || (nodeId != null && streamDict.get(nodeId) != null && streamDict.get(nodeId).length() >= Config.getMessage().getStreamBatchSize())) {
+                if ("stream".equals(messageType)) {
+                    if (streamDict.get(nodeId) == null) {
+                        streamDict.put(nodeId, new ArrayList<String>());
+                    }
+                    streamDict.get(nodeId).add(delta);
+                }
+                if ("stream_end".equals(messageType) || (nodeId != null && streamDict.get(nodeId) != null && streamDict.get(nodeId).size() >= Config.getMessage().getStreamBatchSize())) {
                     body.put("type", "merged_stream");
                     body.put("node_id", content.get("node_id"));
 
                     Map<String, Object> streamMessageData = new HashMap<>();
-                    streamMessageData.put("message_id", CommonUtils.generateShortUUID(16));
+                    streamMessageData.put("message_id", sseMessage.getId());
                     streamMessageData.put("group_id", oxyRequest.getGroupId());
                     streamMessageData.put("trace_id", currentTraceId.get());
                     streamMessageData.put("node_id", nodeId);
                     streamMessageData.put("node_name", content.get("agent"));
                     Map<String, String> streamMessageBody = new HashMap<>();
                     streamMessageBody.put("type", "merged_stream");
-                    streamMessageBody.put("content", streamDict.get(nodeId) != null ? streamDict.get(nodeId).append(delta).toString() : delta);
+                    streamMessageBody.put("content", streamDict.get(nodeId) != null ? String.join("", streamDict.get(nodeId)) : delta);
                     streamMessageData.put("message", JsonUtils.toJSONString(streamMessageBody));
                     streamMessageData.put("message_type", "merged_stream");
-                    streamMessageData.put("message_event", null); // FIXME sse_message.event
+                    streamMessageData.put("message_event", sseMessage.getEvent());
                     streamMessageData.put("message_timestamp", body.get("timestamp") != null ? body.get("timestamp") : CommonUtils.getTimestamp());
                     streamMessageData.put("create_time", CommonUtils.getFormatTime());
                     esClient.index(Config.getAppName() + "_message", streamMessageData.get("message_id").toString(), streamMessageData);
                     streamDict.remove(nodeId);
-                } else if ("stream".equals(messageType)) {
-                    if (streamDict.get(nodeId) == null) {
-                        streamDict.put(nodeId, new StringBuilder());
-                    }
-                    streamDict.put(nodeId, streamDict.get(nodeId).append(delta));
-                    return;
                 } else {
                     Map _copy = ObjectUtils.deepCopy(body);
                     if (funcProcessMessageBody != null) {
@@ -784,14 +791,14 @@ public class Mas {
                         removeAbandonedFields(_copy);
                     }
                     Map<String, Object> nonStreamMessageData = new HashMap<>();
-                    nonStreamMessageData.put("message_id", CommonUtils.generateShortUUID(16)); // FIXME sse_message.id
+                    nonStreamMessageData.put("message_id", sseMessage.getId());
                     nonStreamMessageData.put("group_id", oxyRequest.getGroupId());
                     nonStreamMessageData.put("trace_id", currentTraceId.get());
                     nonStreamMessageData.put("node_id", nodeId);
                     nonStreamMessageData.put("node_name", content.get("agent"));
                     nonStreamMessageData.put("message", JsonUtils.writeValueAsString(_copy));
                     nonStreamMessageData.put("message_type", messageType);
-                    nonStreamMessageData.put("message_event", null); // FIXME sse_message.event
+                    nonStreamMessageData.put("message_event", sseMessage.getEvent());
                     nonStreamMessageData.put("message_timestamp", body.get("timestamp") != null ? body.get("timestamp") : CommonUtils.getTimestamp());
                     nonStreamMessageData.put("create_time", CommonUtils.getFormatTime());
                     nonStreamMessageData.put("from_trace_id", content.get("from_trace_id"));
@@ -808,7 +815,7 @@ public class Mas {
         }
     }
 
-    public byte[] packMessage(Map<String, Object> message) throws IOException {
+    public byte[] packMessage(Object message) throws IOException {
         if (message != null) {
             return objectMapper.writeValueAsBytes(message);
         } else {
@@ -816,8 +823,17 @@ public class Mas {
         }
     }
 
-    public Map unpackMessage(byte[] bytesMsg) throws IOException {
-        return objectMapper.readValue(bytesMsg, Map.class);
+    public SSEMessage unpackMessage(byte[] bytesMsg) throws IOException {
+        // Unpack message
+        SSEMessage sseMessage = null;
+        try {
+            sseMessage = objectMapper.readValue(bytesMsg, SSEMessage.class);
+        } catch (Exception e) {
+            // Compatible with data from older versions
+            Map<String, Object> msgMap = objectMapper.readValue(bytesMsg, Map.class);
+            new SSEMessage((String) msgMap.get("event"), msgMap);
+        }
+        return sseMessage;
     }
 
     /**
@@ -960,7 +976,7 @@ public class Mas {
                 Map<String, Object> message = new HashMap<>();
                 message.put("event", "close");
                 message.put("data", "done");
-                sendMessage(message, sendMsgKey, oxyRequest);
+                sendMessage(new SSEMessage("close", message), sendMsgKey, oxyRequest);
             }
         } finally {
             clearQueues(currentTraceId.get());

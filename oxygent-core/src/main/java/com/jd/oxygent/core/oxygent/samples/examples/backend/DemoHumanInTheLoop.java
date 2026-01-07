@@ -42,6 +42,9 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executors;
 
 /**
  * Demo class for reading config.json properties file
@@ -90,11 +93,15 @@ public class DemoHumanInTheLoop {
 
     private static String workflow(OxyRequest oxyRequest) {
         oxyRequest.sendMessage(Map.of("type", "msg_type", "content", "msg_content"));
-        StringBuilder feedbacks = new StringBuilder();
+
+        String channelId = "my_custom_channel_id";
+        oxyRequest.initFeedbackStream(channelId);
+
+        // simulate sending feedback
         String url = "http://localhost:8888/feedback";
-        String jsonBody = """
-            {"channel_id": "my_custom_channel_id", "data": "my_custom_feedback"}
-            """;
+        String jsonBody = String.format("""
+            {"channel_id": "%s", "data": "my_custom_feedback"}
+            """, channelId);
         HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                 .uri(URI.create(url))
                 .timeout(Duration.ofSeconds(60))
@@ -103,23 +110,15 @@ public class DemoHumanInTheLoop {
         requestHeaders.put("Content-Type", "application/json");
         requestHeaders.forEach(requestBuilder::header);
         HttpRequest request = requestBuilder.build();
-
         try {
-            HttpResponse<InputStream> response = HttpLlm.getHttpClient().send(request,
-                    HttpResponse.BodyHandlers.ofInputStream());
-            InputStream inputStream = response.body();
-            try (BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(inputStream, "UTF-8"))) {
-                String line = null;
-                while ((line = reader.readLine()) != null) {
-                    feedbacks.append(line + "\n");
-                }
-            } catch (IOException e) {
-                log.error("Error reading streaming response", e);
-            }
+            HttpResponse response = HttpLlm.getHttpClient().send(request, HttpResponse.BodyHandlers.ofInputStream());
+            log.info("response statusCode:{}", response.statusCode());
         } catch (IOException | InterruptedException e) {
             log.error("Error sending HTTP request", e);
         }
-        return feedbacks.toString();
+
+        // blocking get feedback stream
+        return oxyRequest.getFeedbackStream(channelId);
     }
 
     /**
