@@ -106,6 +106,9 @@ public class BaseOxy {
     @Builder.Default
     private boolean isSaveData = true;
 
+    /**
+     * List of tools this entity can call
+     */
     @JsonProperty("permitted_tool_name_list")
     @Builder.Default
     private List<String> permittedToolNameList = new ArrayList<>();
@@ -113,6 +116,13 @@ public class BaseOxy {
     @JsonProperty("extra_permitted_tool_name_list")
     @Builder.Default
     private List<String> extraPermittedToolNameList = new ArrayList<>();
+
+    /**
+     * Additional tool permissions
+     */
+    @JsonProperty("permitted_oxy")
+    @Builder.Default
+    private List<String> permittedOxy = new ArrayList<>();
 
     @JsonProperty("is_send_tool_call")
     @Builder.Default

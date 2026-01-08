@@ -18,14 +18,14 @@ body {
 }
 
  ::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(0, 0, 0, 0.4); /* Scrollbar color on mouse hover */
+    background-color: rgba(0, 0, 0, 0.4); /* 鼠标悬停时的滚动条颜色 */
 }
 
 .node-warpper {
     /* background-color: #F3F3F5; */
 }
 
-/* Top sticky positioning */
+/* 顶部吸顶 */
 .node-container-top{
     position: sticky;
     top: 0;
@@ -76,7 +76,7 @@ body {
 
 
 
-/* Node page */
+/*node 页面*/
 .agentCard {
     display: flex;
     align-items: center;
@@ -271,15 +271,15 @@ body {
     line-height: 1.5;
     color: rgb(0, 0, 0);
     width: 100%;
-    /* Remove border */
+    /* 移除边框 */
     border: none;
-    /* Remove outline (outer border on focus) */
+    /* 移除轮廓线（focus时的外边框） */
     outline: none;
-    /* Remove background color */
+    /* 移除背景色 */
     background: none;
-    /* Reset padding */
+    /* 重置内边距 */
     padding: 5px;
-    /* Reset margin */
+    /* 重置外边距 */
     margin: 0;
 }
 
@@ -301,15 +301,15 @@ body {
 
 .section-input {
     width: 100px;
-    /* Remove border */
+    /* 移除边框 */
     border: none;
-    /* Remove outline (outer border on focus) */
+    /* 移除轮廓线（focus时的外边框） */
     outline: none;
-    /* Remove background color */
+    /* 移除背景色 */
     background: none;
-    /* Reset padding */
+    /* 重置内边距 */
     padding: 0;
-    /* Reset margin */
+    /* 重置外边距 */
     margin: 0;
 }
 
@@ -408,7 +408,7 @@ body {
 }
 
 
-/* Switch container */
+/* Switch 容器 */
 .switch {
     position: relative;
     display: inline-block;
@@ -416,14 +416,14 @@ body {
     height: 24px;
 }
 
-/* Hide default checkbox */
+/* 隐藏默认的 checkbox */
 .switch input {
     opacity: 0;
     width: 0;
     height: 0;
 }
 
-/* Slider styles */
+/* 滑块样式 */
 .slider {
     position: absolute;
     cursor: pointer;
@@ -448,7 +448,7 @@ body {
     border-radius: 50%;
 }
 
-/* Styles when checkbox is checked */
+/* 当 checkbox 被选中时的样式 */
 input:checked + .slider {
     background-color: #5048E5;
 }
@@ -461,7 +461,7 @@ input:checked + .slider:before {
     transform: translateX(13px);
 }
 
-/* Disabled state */
+/* 禁用状态 */
 input:disabled + .slider {
     background-color: #e0e0e0;
     cursor: not-allowed;
@@ -563,7 +563,7 @@ li {
 }
 
 
-/*input slider support*/
+/*input 滑块支持*/
 .slider-container-input {
     display: flex;
     justify-content: space-between;
@@ -592,7 +592,7 @@ li {
     position: relative;
 }
 
-/* Track background (unslid part) */
+/* 轨道背景（未滑动部分） */
 .slider-track-input {
     position: absolute;
     top: 50%;
@@ -605,29 +605,29 @@ li {
     z-index: 1;
 }
 
-/* Slid part (blue) */
+/* 已滑动部分（蓝色） */
 .slider-fill-input {
     position: absolute;
     top: 50%;
     left: 0;
     transform: translateY(-50%);
     height: 8px;
-    background: #5048E5; /* Blue */
+    background: #5048E5; /* 蓝色 */
     border-radius: 4px;
     z-index: 1;
-    width: 50%; /* Initial value */
+    width: 50%; /* 初始值 */
 }
 
-/* Slider style - white small square */
+/* 滑块样式 - 白色小方块 */
 .slider-input::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
-    width: 16px; /* Square width */
-    height: 16px; /* Square height */
-    background: white; /* White */
+    width: 16px; /* 方块宽度 */
+    height: 16px; /* 方块高度 */
+    background: white; /* 白色 */
     cursor: pointer;
-    border: 2px solid white; /* Blue border */
-    border-radius: 2px; /* Small rounded corners */
+    border: 2px solid white; /* 蓝色边框 */
+    border-radius: 2px; /* 小圆角 */
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
     z-index: 3;
     position: relative;

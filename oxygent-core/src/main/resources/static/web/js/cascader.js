@@ -1,11 +1,4 @@
-/**
- * Cascader Component
- * @author OxyGent Team
- * @version 1.0.0
- * @since 1.0.0
- */
-
-// Cascader constructor function
+// 级联选择器构造函数
 function Cascader(config) {
     this.inputEl = document.querySelector(config.el);
     this.dropdownEl = document.querySelector(config.dropdown);
@@ -31,13 +24,13 @@ Cascader.prototype.destroy = function() {
     }
 };
 
-// Initialize method
+// 初始化方法
 Cascader.prototype.init = function () {
     this.renderInput();
     this.bindEvents();
 };
 
-// Render input box
+// 渲染输入框
 Cascader.prototype.renderInput = function () {
     var placeholder = this.inputEl.querySelector('.placeholder');
     // if (this.selectedOptions.length > 0) {
@@ -47,28 +40,28 @@ Cascader.prototype.renderInput = function () {
     //     placeholder.textContent = labels.join(' / ');
     //     placeholder.style.color = '#333';
     // } else {
-    //     placeholder.textContent = 'Please select';
+    //     placeholder.textContent = '请选择';
     //     placeholder.style.color = '#999';
     // }
 };
 
-// Bind events
+// 绑定事件
 Cascader.prototype.bindEvents = function () {
     var self = this;
 
-    // Input box click event
+    // 输入框点击事件
     this.inputEl.addEventListener('click', function (e) {
         e.stopPropagation();
         self.toggleDropdown();
     });
 
-    // Document click event to close dropdown menu
+    // 文档点击事件，用于关闭下拉菜单
     document.addEventListener('click', function () {
         self.hideDropdown();
     });
 };
 
-// Toggle dropdown menu show/hide
+// 切换下拉菜单显示/隐藏
 Cascader.prototype.toggleDropdown = function () {
     if (this.dropdownEl.classList.contains('show')) {
         this.hideDropdown();
@@ -77,38 +70,38 @@ Cascader.prototype.toggleDropdown = function () {
     }
 };
 
-// Show dropdown menu
+// 显示下拉菜单
 Cascader.prototype.showDropdown = function () {
     this.dropdownEl.classList.add('show');
     this.inputEl.querySelector('.arrow').classList.add('open');
     this.renderMenus();
 };
 
-// Hide dropdown menu
+// 隐藏下拉菜单
 Cascader.prototype.hideDropdown = function () {
     this.dropdownEl.classList.remove('show');
     this.inputEl.querySelector('.arrow').classList.remove('open');
 };
 
-// Render cascader menu
+// 渲染级联菜单
 Cascader.prototype.renderMenus = function () {
     var menusContainer = this.dropdownEl.querySelector('.cascader-menus');
     menusContainer.innerHTML = '';
 
-    // If no item is selected, only show first level menu
+    // 如果没有选择任何项，只显示第一级菜单
     if (this.selectedValues.length === 0) {
         var menu = this.createMenu(this.options, 0);
         menusContainer.appendChild(menu);
         return;
     }
 
-    // Show selected level menus
+    // 显示已选择的各级菜单
     var currentOptions = this.options;
     for (var i = 0; i < this.selectedValues.length; i++) {
         var menu = this.createMenu(currentOptions, i);
         menusContainer.appendChild(menu);
 
-        // Highlight selected options
+        // 高亮已选中的选项
         var selectedValue = this.selectedValues[i];
         var optionEls = menu.querySelectorAll('.cascader-option');
         for (var j = 0; j < optionEls.length; j++) {
@@ -117,7 +110,7 @@ Cascader.prototype.renderMenus = function () {
             }
         }
 
-        // Find next level options
+        // 查找下一级选项
         var selectedOption = null;
         for (var k = 0; k < currentOptions.length; k++) {
             if (currentOptions[k].value === selectedValue) {
@@ -133,7 +126,7 @@ Cascader.prototype.renderMenus = function () {
         }
     }
 
-    // If has children, show next level menu
+    // 如果有子级，显示下一级菜单
     if (currentOptions && currentOptions.length > 0) {
         console.log(currentOptions);
         var nextMenu = this.createMenu(currentOptions, this.selectedValues.length);
@@ -141,7 +134,7 @@ Cascader.prototype.renderMenus = function () {
     }
 };
 
-// Create single menu
+// 创建单个菜单
 Cascader.prototype.createMenu = function (options, level) {
     var menu = document.createElement('div');
     menu.className = 'cascader-menu';
@@ -174,10 +167,10 @@ Cascader.prototype.createMenu = function (options, level) {
 };
 
 
-// Handle option click
+// 处理选项点击
 Cascader.prototype.handleOptionClick = function (option, level) {
     console.log(option);
-    // Update selected values
+    // 更新选中值
     this.selectedValues = this.selectedValues.slice(0, level);
     this.selectedOptions = this.selectedOptions.slice(0, level);
 
@@ -187,7 +180,7 @@ Cascader.prototype.handleOptionClick = function (option, level) {
         label: option.label
     });
 
-    // If no children, close dropdown menu
+    // 如果没有子级，则关闭下拉菜单
     if (!option.children || option.children.length === 0) {
         this.hideDropdown();
         this.renderInput();
@@ -196,7 +189,7 @@ Cascader.prototype.handleOptionClick = function (option, level) {
         return;
     }
 
-    // Re-render menus
+    // 重新渲染菜单
     this.renderMenus();
 };
 

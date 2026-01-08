@@ -6,26 +6,26 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <link rel="shortcut icon" href="image/group-favicon.png" type="image/x-icon">
+    <link rel="shortcut icon" href="./image/group-favicon.png" type="image/x-icon">
     <title>OxyGent App</title>
-    <link rel="stylesheet" href="css/style.css?time=2">
-    <link rel="stylesheet" href="css/main.css?time=2"/>
-    <link rel="stylesheet" href="css/tree.css?time=2"/>
-    <link rel="stylesheet" href="css/cascader.css?time=2"/>
-    <link rel="stylesheet" href="css/file.css?time=2"/>
-    <link rel="stylesheet" href="css/agent-list.css?time=2"/>
+    <link rel="stylesheet" href="./css/style.css?time=2">
+    <link rel="stylesheet" href="./css/main.css?time=2"/>
+    <link rel="stylesheet" href="./css/tree.css?time=2"/>
+    <link rel="stylesheet" href="./css/cascader.css?time=2"/>
+    <link rel="stylesheet" href="./css/file.css?time=2"/>
+    <link rel="stylesheet" href="./css/agent-list.css?time=2"/>
     <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
-    <script src="js/utils.js?time=2"></script>
-    <script src="js/marked.min.js?time=2"></script>
-    <script src="js/agent_tree.js?time=2"></script>
-    <script src="js/cascader.js?time=2"></script>
-    <script src="js/upload.js?time=2"></script>
-    <script src="js/message.js?time=2"></script>
+    <script src="./js/utils.js?time=2"></script>
+    <script src="./js/marked.min.js?time=2"></script>
+    <script src="./js/agent_tree.js?time=2"></script>
+    <script src="./js/cascader.js?time=2"></script>
+    <script src="./js/upload.js?time=2"></script>
+    <script src="./js/message.js?time=2"></script>
 </head>
 <body>
 <div class="header">
     <div class="header-left">
-        <img class="header-left-img" src="image/group-favicon.png" alt="">
+        <img class="header-left-img" src="./image/group-favicon.png" alt="">
         <!--        <div class="operate">-->
         <!--            <button onclick="save_historys()">save</button>-->
         <!--            <div class="nice-select">-->
@@ -48,23 +48,31 @@
     </div>
     <div id="header_title_id" class="header-title"></div>
     <div class="header-right">
+        <button class="btn-history" onclick="window.open('history.html', '_blank')" title="Conversation History">
+            <img src="./image/history.svg" alt="History"/>
+            History
+        </button>
+        <button class="btn-history" onclick="window.open('prompts.html', '_blank')" title="Prompt Management">
+            <img src="./image/prompt.svg" alt="Prompts"/>
+            Prompts
+        </button>
         <div class="control">
             <button onclick="begin()">
-                <img src="image/arrow-left-double.svg" alt=""/>
+                <img src="./image/arrow-left-double.svg" alt=""/>
             </button>
             <button onclick="back()">
-                <img src="image/arrow-left.svg" alt=""/>
+                <img src="./image/arrow-left.svg" alt=""/>
             </button>
 
             <button data-status="play" id="play" onclick="play()">
-                <img src="image/play.svg" alt=""/>
+                <img src="./image/play.svg" alt=""/>
             </button>
 
             <button onclick="next()">
-                <img src="image/arrow-right.svg" alt=""/>
+                <img src="./image/arrow-right.svg" alt=""/>
             </button>
             <button onclick="end()">
-                <img src="image/arrow-right-double.svg" alt=""/>
+                <img src="./image/arrow-right-double.svg" alt=""/>
             </button>
             <div id="step"></div>
         </div>
@@ -90,7 +98,7 @@
                 </div>
                 <div class="chat_toggle_group">
                     <button id="message_group" onclick="openRight()">
-                        <img src="image/group-vector-default.svg" alt=""/>
+                        <img src="./image/group-vector-default.svg" alt=""/>
                     </button>
                 </div>
             </div>
@@ -143,14 +151,14 @@
                         accept=".txt,.jpg,.jpeg,.png,.mp4,.xlsx,.xls,.doc,.docx,.pdf,.csv,.tsv,.ods,.py,.md,.json"
                         style="display: none;"
                     >
-                    <img src="image/group_addtion.svg" alt=""/>
+                    <img src="./image/group_addtion.svg" alt=""/>
                     <span class="file-tooltip">
                         <span class="file-tooltip-title"> Upload attachments </span>
                         <span class="file-tooltip-description">Max 10, 10MB each. Images, videos and table files are supported.</span>
                     </span>
                 </button>
                 <button id="message_send" onclick="send_message()">
-                    <img src="image/up_arrow.svg" alt=""/>
+                    <img src="./image/up_arrow.svg" alt=""/>
                 </button>
             </div>
         </div>
@@ -160,12 +168,12 @@
         <div class="right-container">
             <div id="agent_log">
                 <div class="agent-empty">
-                    <img class="empty-img" src="image/empty.svg" alt="">
+                    <img class="empty-img" src="./image/empty.svg" alt="">
                 </div>
             </div>
-            <button id="agent_log_close_id" onclick="closeRight()">
-                <img src="image/group_close.svg" alt=""/>
-            </button>
+                <button id="agent_log_close_id" onclick="closeRight()">
+                    <img src="./image/group_close.svg" alt=""/>
+                </button>
         </div>
 
     </div>
@@ -186,9 +194,9 @@
     var show_id = 0;
     var agent_id_dict = {};
     var agent_organization = {};
-    var current_streaming_agent = null; // Name of the agent currently streaming output (for backward compatibility)
-    var current_streaming_element = null; // The DOM element currently streaming output (for backward compatibility)
-    var streaming_elements_map = {}; // Store streaming output elements corresponding to different node_ids: { node_id: { agent, element } }
+    var current_streaming_agent = null; // 当前正在流式输出的agent名称（向后兼容）
+    var current_streaming_element = null; // 当前正在流式输出的DOM元素（向后兼容）
+    var streaming_elements_map = {}; // 存储不同node_id对应的流式输出元素 {node_id: {agent, element}}
 
     var master_agent_name = "master_agent";
     var div_right = $("#agent_log");
@@ -546,13 +554,13 @@
             return;
         }
         let jm = JSON.parse(message);
-
-        // Process streaming output messages
+        
+        // 处理流式输出消息
         if (jm["type"] === "stream") {
             handle_stream_message(jm);
             return;
         }
-
+        
         if (!["tool_call", "observation"].includes(jm["type"])) {
             return;
         }
@@ -584,10 +592,10 @@
                 chats.push(msg);
                 history["answer"] = JSON.parse(JSON.stringify(chats));
             } else if (jm["content"]["caller_category"] === 'agent' && jm["content"]["callee_category"] === 'llm') {
-                // Start calling LLM and prepare for streaming output.
+                // 开始调用llm，准备流式输出
                 current_streaming_agent = jm["content"]["caller"];
                 var node_id = jm["content"]["node_id"];
-                // Create the message element for streaming output.
+                // 创建流式输出的消息元素
                 create_streaming_message_element(current_streaming_agent, node_id);
                 return;
             }
@@ -597,47 +605,50 @@
             if (jm["content"]["caller"] === 'user') {
                 // answer
                 from_trace_id = jm["content"]["current_trace_id"];
+                var trace_id = jm["content"]["current_trace_id"] || jm["content"]["trace_id"];
                 var markdownInput = jm["content"]["output"];
                 if (typeof markdownInput !== 'string') {
                     markdownInput = JSON.stringify(markdownInput, null, 2);
                 }
-                // If a streaming output element exists, use its content (which may be more complete).
-                // Look up the corresponding streaming output element (prefer node_id; otherwise, fall back to agent
+                // 如果存在流式输出元素，使用流式输出的内容（可能更完整）
+                // 查找对应的流式输出元素（优先使用node_id，否则使用agent名称）
                 var node_id = jm["content"]["node_id"];
                 var agent_name = jm["content"]["callee"];
                 var key = node_id || agent_name;
                 var streaming_info = streaming_elements_map[key];
-
+                
                 if (streaming_info && streaming_info.element) {
                     var finalContent = streaming_info.element.text();
                     if (finalContent) {
                         markdownInput = finalContent;
                     }
-                    // Remove the streaming-content class and clean up
+                    // 移除streaming-content类并清理
                     streaming_info.element.removeClass("streaming-content");
+                    attach_rating_ui(streaming_info.element.closest("li"), trace_id);
                     delete streaming_elements_map[key];
                 } else if (current_streaming_element && current_streaming_agent) {
-                    // for backward compatibility
+                    // 向后兼容
                     var finalContent = current_streaming_element.text();
                     if (finalContent) {
                         markdownInput = finalContent;
                     }
+                    attach_rating_ui(current_streaming_element.closest("li"), trace_id);
                 }
-
-                var msg = {"role": jm["content"].callee, "content": markdownInput};
+                
+                var msg = {"role": jm["content"].callee, "content": markdownInput, "trace_id": trace_id};
                 chats.push(msg);
                 history["answer"] = JSON.parse(JSON.stringify(chats));
                 llm_is_work = false;
                 // $("#message_send").text("Send");
-                // react_memory
+                // 重置react_memory
                 plan_dict = {};
-                // Streaming output complete; remove the streaming-content class (for backward compatibility).
+                // 流式输出完成，移除streaming-content类（向后兼容）
                 if (current_streaming_element) {
                     current_streaming_element.removeClass("streaming-content");
                     current_streaming_element = null;
                 }
                 current_streaming_agent = null;
-                // Clean up all streaming output elements.
+                // 清理所有流式输出元素
                 streaming_elements_map = {};
             } else if (jm["content"]["caller_category"] === 'agent' && jm["content"]["callee_category"] === 'agent') {
                 push_plan(jm["content"]["caller"], "observation", jm["content"].output, jm["content"].node_id, jm["content"]["callee"]);
@@ -653,8 +664,8 @@
             } else if (jm["content"]["caller_category"] === 'agent' && jm["content"]["callee_category"] === 'llm') {
                 push_plan(jm["content"]["caller"], "plan", jm["content"].output, jm["content"].node_id, jm["content"]["callee"]);
                 history["agent_log"] = JSON.parse(JSON.stringify(plan_dict[jm["content"]["caller"]]));
-                // Streaming output complete; remove the streaming-content class.
-                // Note: planning content is not saved to chats, only to plan_dict.
+                // 流式输出完成，移除streaming-content类
+                // 注意：planning内容不保存到chats，只保存到plan_dict
                 var node_id = jm["content"]["node_id"];
                 var key = node_id || jm["content"]["caller"];
                 var streaming_info = streaming_elements_map[key];
@@ -662,7 +673,7 @@
                     streaming_info.element.removeClass("streaming-content");
                     delete streaming_elements_map[key];
                 }
-                // For backward compatibility
+                // 向后兼容
                 if (current_streaming_element) {
                     current_streaming_element.removeClass("streaming-content");
                     current_streaming_element = null;
@@ -767,20 +778,20 @@
         begin();
     }
 
-    // Create the message element for streaming output.
+    // 创建流式输出的消息元素
     function create_streaming_message_element(agent_name, node_id) {
         // 如果提供了node_id，使用node_id作为key
         var key = node_id || agent_name;
-
-        // Check if a streaming output element already exists.
+        
+        // 检查是否已经存在流式输出元素
         if (streaming_elements_map[key]) {
             return streaming_elements_map[key].element;
         }
-
+        
         var li = $("<li>");
         var li_class = "master";
         li.addClass(li_class);
-
+        
         const idx = agent_id_dict[agent_name] % 16;
         li.append(
             $("<img>")
@@ -788,54 +799,54 @@
                 .css("background-color", agentImgMap[idx]?.bgColor)
         );
         li.append($("<p>").text(agent_name));
-
-        // Create an empty <span> for streaming output content and add the streaming-content class.
+        
+        // 创建空的span用于流式输出内容，添加streaming-content类
         var contentSpan = $('<span class="streaming-content">');
         li.append(contentSpan);
-
+        
         div_chatbox.append(li);
-
-        // Store in the map
+        
+        // 存储到map中
         streaming_elements_map[key] = {
             agent: agent_name,
             element: contentSpan,
             node_id: node_id
         };
-
-        // For backward compatibility: update global variables
+        
+        // 向后兼容：更新全局变量
         current_streaming_element = contentSpan;
         current_streaming_agent = agent_name;
-
+        
         scroll_top_div_chat_history();
         return contentSpan;
     }
-
-    // Handle streaming messages
+    
+    // 处理流式消息
     function handle_stream_message(jm) {
         var agent_name = jm["content"]["agent"];
         var node_id = jm["content"]["node_id"];
         var delta = jm["content"]["delta"] || "";
-
+        
         if (!delta) {
             return;
         }
-
-        // Get or create a streaming output element
+        
+        // 如果没有agent名称，使用默认值（向后兼容）
         if (!agent_name) {
             agent_name = current_streaming_agent || master_agent_name;
         }
-
+        
         // 获取或创建流式输出元素
         var key = node_id || agent_name;
         var streaming_info = streaming_elements_map[key];
-
+        
         if (!streaming_info) {
-            // Create a new streaming output element
+            // 创建新的流式输出元素
             create_streaming_message_element(agent_name, node_id);
             streaming_info = streaming_elements_map[key];
         }
-
-        // Append streaming content
+        
+        // 追加流式内容
         if (streaming_info && streaming_info.element) {
             var currentText = streaming_info.element.text();
             streaming_info.element.text(currentText + delta);
@@ -843,13 +854,203 @@
         }
     }
 
-    function send_msg_to_chatbox(msg, name = "user", at = "", scroll_top = true) {
+    const rating_config = {
+        endpoint: "/rating",
+        erp: "oxygent"
+    };
+
+    function submit_rating(container, rating_type, comment) {
+        var trace_id = container.data("trace-id");
+        if (!trace_id) {
+            return;
+        }
+        
+        fetch(rating_config.endpoint, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                trace_id: trace_id,
+                rating_type: rating_type,
+                comment: comment || "",
+                erp: rating_config.erp
+            })
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Request failed");
+                }
+                return response.json();
+            })
+            .then(function () {
+                // Reset active states
+                container.find(".btn-icon").removeClass("active");
+                
+                // Set new active state (triggers CSS animation)
+                if (rating_type === "like") {
+                    container.find(".btn-icon.like").addClass("active");
+                } else if (rating_type === "dislike") {
+                    container.find(".btn-icon.dislike").addClass("active");
+                }
+            })
+            .catch(function (err) {
+                console.error("Rating submission error:", err);
+            });
+    }
+
+    function create_rating_container(trace_id) {
+        var container = $('<div class="message-rating-container">').data("trace-id", trace_id);
+        var actions = $('<div class="message-rating-actions">');
+
+        // Outline SVGs for Like/Dislike
+        var likeSvg = '<svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>';
+        var dislikeSvg = '<svg viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path></svg>';
+
+        var likeBtn = $('<button type="button" class="btn-icon like" title="Good response">' + likeSvg + '</button>');
+        var dislikeBtn = $('<button type="button" class="btn-icon dislike" title="Bad response">' + dislikeSvg + '</button>');
+
+        // Feedback Panel
+        var feedbackPanel = $('<div class="feedback-panel">');
+        var feedbackHeader = $('<div class="feedback-header"><span>What\'s the issue?</span><span class="feedback-close">&times;</span></div>');
+        
+        // Row 1: Options + Submit Button (Dynamic Slot 1)
+        var row1 = $('<div class="feedback-row-1">');
+        var feedbackOptions = $('<div class="feedback-options">');
+        row1.append(feedbackOptions);
+
+        // Row 2: Input + Submit Button (Dynamic Slot 2)
+        var row2 = $('<div class="feedback-row-2">');
+        var inputWrapper = $('<div class="feedback-input-wrapper">');
+        var customInput = $('<input type="text" class="feedback-input" placeholder="(Optional) Tell us more about your experience">');
+        inputWrapper.append(customInput);
+        row2.append(inputWrapper);
+
+        // Submit Button (Single instance moved around)
+        var submitBtn = $('<button class="feedback-submit-btn">Submit</button>');
+
+        var reasons = [
+            "Offensive/Unsafe",
+            "Factually incorrect",
+            "Not helpful",
+            "Privacy concern",
+            "Other"
+        ];
+
+        // Build Options
+        reasons.forEach(function(reason) {
+            var btn = $('<button class="feedback-option">' + reason + '</button>');
+            btn.on("click", function() {
+                $(this).toggleClass('selected');
+                updatePanelState();
+            });
+            feedbackOptions.append(btn);
+        });
+
+        function updatePanelState() {
+            var selectedTags = feedbackOptions.find('.feedback-option.selected');
+            var isOtherSelected = false;
+            var hasSelection = selectedTags.length > 0;
+
+            selectedTags.each(function() {
+                if ($(this).text() === "Other") {
+                    isOtherSelected = true;
+                }
+            });
+
+            if (!hasSelection) {
+                submitBtn.hide();
+                row2.hide(); 
+                if (submitBtn.parent().length) submitBtn.detach(); 
+            } else {
+                submitBtn.show(); 
+                submitBtn.css('display', 'block'); 
+
+                if (isOtherSelected) {
+                    // Mode 2: Show Row 2, Move button to Row 2
+                    row2.css('display', 'flex'); 
+                    row2.append(submitBtn);
+                    customInput.focus();
+                } else {
+                    // Mode 1: Hide Row 2, Move button to Row 1
+                    row2.hide();
+                    customInput.val(''); 
+                    row1.append(submitBtn);
+                }
+            }
+        }
+
+        // Close logic
+        feedbackHeader.find('.feedback-close').on('click', function() {
+            feedbackPanel.fadeOut(200);
+        });
+
+        // Submit Logic
+        submitBtn.on('click', function() {
+            var selectedReasons = [];
+            feedbackOptions.find('.feedback-option.selected').each(function() {
+                selectedReasons.push($(this).text());
+            });
+            
+            var comment = customInput.val().trim();
+            
+            var finalReason = selectedReasons.join(", ");
+            if (comment) {
+                if (finalReason) {
+                    finalReason += " | Details: " + comment;
+                } else {
+                    finalReason = comment;
+                }
+            }
+            
+            submit_rating(container, "dislike", finalReason || "Unspecified feedback");
+            feedbackPanel.fadeOut(200);
+        });
+
+        feedbackPanel.append(feedbackHeader, row1, row2);
+
+        // Button Actions
+        likeBtn.on("click", function () {
+            // Close feedback panel if open
+            feedbackPanel.hide();
+            // Submit Like
+            submit_rating(container, "like", "");
+        });
+
+        dislikeBtn.on("click", function () {
+            // Toggle Feedback Panel
+            if (feedbackPanel.is(':visible')) {
+                feedbackPanel.fadeOut(200);
+            } else {
+                feedbackPanel.fadeIn(200);
+                // Reset state
+                feedbackOptions.find('.feedback-option').removeClass('selected');
+                submitBtn.hide();
+                row2.hide();
+                customInput.val('');
+            }
+        });
+
+        actions.append(likeBtn, dislikeBtn);
+        container.append(actions, feedbackPanel);
+        return container;
+    }
+
+    function attach_rating_ui(li, trace_id) {
+        if (!trace_id || !li || li.length === 0) {
+            return;
+        }
+        if (li.find(".message-rating-container").length > 0) {
+            return;
+        }
+        li.append(create_rating_container(trace_id));
+    }
+
+    function send_msg_to_chatbox(msg, name = "user", at = "", scroll_top = true, trace_id = "") {
         var li = $("<li>");
         if (name === "user") {
             li.addClass("me");
             li.append(`
                     <span class="user-img">
-                        <img src="image/user.svg" />
+                        <img src="./image/user.svg" />
                     </span>
                 `);
         } else {
@@ -880,6 +1081,10 @@
             li.append($('<span>').append($("<section>").css("color", agentImgMap[agent_id_dict[at]]?.color).text("@" + at)).append(msg));
         }
 
+        if (name === master_agent_name && at === "") {
+            attach_rating_ui(li, trace_id);
+        }
+
         if (name === "user" && filesToUpload.length > 0) {
             var fileList = document.createElement('div');
             fileList.className = 'file-list-chat';
@@ -888,7 +1093,7 @@
                 fileItem.className = 'file-item';
                 fileItem.innerHTML = `
                             <div class="file-icon">
-                                <img src="image/video.svg" alt=""></img>
+                                <img src="./image/video.svg" alt=""></img>
                             </div>
                             <div class="file-info">
                                 <div class="file-name">${_file.name}</div>
@@ -982,14 +1187,14 @@
             eventSource.onerror = (e) => {
                 console.log('SSE 连接发生错误', e);
                 $("#message_send").html(`
-                    <img src="image/up_arrow.svg" alt="" />
+                    <img src="./image/up_arrow.svg" alt="" />
                 `);
                 eventSource.close();
             };
             eventSource.addEventListener("close", (event) => {
                 console.log("任务完成，关闭SSE连接:", event.data);
                 $("#message_send").html(`
-                    <img src="image/up_arrow.svg" alt="" />
+                    <img src="./image/up_arrow.svg" alt="" />
                 `);
                 eventSource.close(); // 主动关闭连接
             });
@@ -1005,14 +1210,14 @@
             send_msg_to_chatbox(message);
             llm_is_work = true;
             $("#message_send").html(`
-                    <img src="image/stop-circle.svg" alt="" />
+                    <img src="./image/stop-circle.svg" alt="" />
                 `);
         } else {
             eventSource.close();
             llm_is_work = false;
             plan_dict = {};
             $("#message_send").html(`
-                <img src="image/up_arrow.svg" alt="" />
+                <img src="./image/up_arrow.svg" alt="" />
             `);
         }
     }
@@ -1031,7 +1236,7 @@
             } else if (no_change_history && from_size < to_size) {
                 // add
                 jm["content"].slice(from_size - to_size).forEach(chat => {
-                    send_msg_to_chatbox(chat.content, chat.role, chat.at, false);
+                    send_msg_to_chatbox(chat.content, chat.role, chat.at, false, chat.trace_id);
                 });
                 scroll_top_div_chat_history();
                 return;
@@ -1039,7 +1244,7 @@
             no_change_history = true;
             div_chatbox.empty();
             jm["content"].forEach(chat => {
-                send_msg_to_chatbox(chat.content, chat.role, chat.at, false);
+                send_msg_to_chatbox(chat.content, chat.role, chat.at, false, chat.trace_id);
             });
             scroll_top_div_chat_history();
         }
@@ -1104,7 +1309,7 @@
                                 .append($("<div class='plannings-head'>")
                                 .text(agent_log["plannings"][i].callee));
                         }
-
+                            
                         div_right
                             .append($("<div class='plannings-output-head'>")
                             .text('Output'));
@@ -1141,9 +1346,7 @@
                     $("#" + key).addClass('pre-select');
 
                 } else if (value === 'white') { // 恢复初始态
-                    setTimeout(() => {
-                       $("#" + key).removeClass('select');
-                    }, 300);
+                    $("#" + key).removeClass('select');
                     $("#" + key).removeClass('pre-select');
                 } else {
 
@@ -1190,7 +1393,7 @@
         div_right.empty();
         div_right.append(`
             <div class="agent-empty">
-                <img class="empty-img" src="image/empty.svg" alt="">
+                <img class="empty-img" src="./image/empty.svg" alt="">
             </div>
         `);
         show_step();
@@ -1211,7 +1414,7 @@
         if (status == "play") {
             if (show_id < historys.length - 1) {
                 $("#play").html(`
-                        <img src="image/pause.svg" alt="" />
+                        <img src="./image/pause.svg" alt="" />
                     `);
                 $("#play")[0].setAttribute('data-status', 'pause');
 
@@ -1223,7 +1426,7 @@
                     } else {
                         clearInterval(interval_id);
                         $("#play").html(`
-                                <img src="image/play.svg" alt="" />
+                                <img src="./image/play.svg" alt="" />
                             `);
                         $("#play")[0].setAttribute('data-status', 'play');
                     }
@@ -1232,7 +1435,7 @@
         } else {
             clearInterval(interval_id);
             $("#play").html(`
-                    <img src="image/play.svg" alt="" />
+                    <img src="./image/play.svg" alt="" />
                 `);
             $("#play")[0].setAttribute('data-status', 'play');
         }
@@ -1348,7 +1551,7 @@
     function load_historys(script_id) {
         $.ajax({
             type: "GET",
-            url: "../load_script",
+            url: "../load_script/",
             data: {
                 item_id: script_id
             },
@@ -1357,7 +1560,7 @@
                 clearInterval(interval_id);
 
                 $("#play").html(`
-                        <img src="image/play.svg" alt="" />
+                        <img src="./image/play.svg" alt="" />
                     `);
                 $("#play")[0].setAttribute('data-status', 'play');
 
@@ -1411,13 +1614,13 @@
     // 关闭最右侧对话框
     function closeRight() {
         $('#rightId').css('display', 'none');
-        $('#message_group').html('<img src="image/group-vector-active.svg" alt=""/>')
+        $('#message_group').html('<img src="./image/group-vector-active.svg" alt=""/>')
     }
 
     function openRight() {
         if ($('#rightId').css('display') == 'none') {
-            $('#message_group').html('<img src="image/group-vector-default.svg" alt=""/>')
-            $('#rightId').css('display', 'block');
+            $('#message_group').html('<img src="./image/group-vector-default.svg" alt=""/>')
+            $('#rightId').css('display', 'block');    
         }
     }
 
@@ -1522,7 +1725,7 @@
                         clearInterval(interval_id);
 
                         $("#play").html(`
-                                <img src="image/play.svg" alt="" />
+                                <img src="./image/play.svg" alt="" />
                             `);
                         $("#play")[0].setAttribute('data-status', 'play');
 
@@ -1548,7 +1751,7 @@
             };
             reader.readAsText(file);
         });
-
+    
 
     function handleFileCascader(response) {
         const recentData = response.map(function (item) {
@@ -1567,7 +1770,7 @@
             return item;
         })
 
-
+        
         // 初始化级联选择器
         if (_cascader) {
             _cascader.updateOptions(options)
@@ -1726,14 +1929,14 @@
 
             fileItem.innerHTML = `
                         <div class="file-icon">
-                            <img src="image/video.svg" alt=""></img>
+                            <img src="./image/video.svg" alt=""></img>
                         </div>
                         <div class="file-info">
                             <div class="file-name">${file.name}</div>
                             <div class="file-size">${file.size}KB</div>
                         </div>
                         <div class="file-close" data-id="${file.name}">
-                            <img src="image/group_close.svg" alt="#">
+                            <img src="./image/group_close.svg" alt="#">
                         </div>
 
                     `;
@@ -1775,7 +1978,7 @@
                         <div class="chat-agent-name"><span>@</span>${argentName}</div>
                     </div>
                     <div class="chat-agent-close" onclick="chatAgentClose('${argentName}')" data-id="Group-favicon.png">
-                        <img src="image/group_close.svg" alt="#">
+                        <img src="./image/group_close.svg" alt="#">
                     </div>
                 </div>
             `;

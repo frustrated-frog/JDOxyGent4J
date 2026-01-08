@@ -1114,4 +1114,11 @@ public class CommonUtils {
             return "image/jpeg"; // Default
         }
     }
+
+    public static <T> T getOrDefault(T data, T defaultValue) {
+        if (data == null || "".equals(data.toString()) || "null".equals(data.toString())) {
+            return defaultValue;
+        }
+        return data;
+    }
 }

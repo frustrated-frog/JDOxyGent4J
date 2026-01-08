@@ -381,6 +381,64 @@ public class LocalEs extends BaseDB implements BaseEs {
         return result;
     }
 
+    @Override
+    public Map<String, Object> delete(String indexName, String docId) {
+        Path dataPath = FileUtils.getIndexPath(dataDir, indexName);
+        Path backupPath = Paths.get(dataPath.toString() + ".bak");
+
+        ReentrantLock lock = locks.computeIfAbsent(indexName, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            // --- load existing data ---
+            Map<String, Object> data = FileUtils.readJsonSafe(dataDir, dataPath);
+
+            if (data == null) { // unrecoverable corruption; try backup once
+                if (Files.exists(backupPath)) {
+                    try {
+                        Files.move(backupPath, dataPath, StandardCopyOption.REPLACE_EXISTING);
+                        data = FileUtils.readJsonSafe(dataDir, dataPath);
+                    } catch (IOException e) {
+                        logger.warning("Failed to restore from backup: " + e.getMessage());
+                    }
+                }
+            }
+
+            if (data == null) {
+                // still corrupted – preserve original file, switch to fresh store
+                Path corruptPath = Paths.get(dataPath.toString() + ".corrupt");
+                try {
+                    Files.move(dataPath, corruptPath, StandardCopyOption.REPLACE_EXISTING);
+                    logger.severe("Index " + indexName + " is corrupted – moved to " + corruptPath);
+                } catch (IOException e) {
+                    logger.severe("Failed to move corrupted file: " + e.getMessage());
+                }
+                data = new LinkedHashMap<>();
+            }
+
+            // --- apply mutation ---
+            data.remove(docId);
+
+            // --- backup & persist ---
+            try {
+                if (Files.exists(dataPath)) {
+                    Files.move(dataPath, backupPath, StandardCopyOption.REPLACE_EXISTING);
+                }
+                FileUtils.writeJsonAtomic(dataDir, dataPath, data);
+            } catch (IOException e) {
+                logger.severe("Failed to persist data: " + e.getMessage());
+                throw new RuntimeException(e);
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("_id", docId);
+            result.put("result", "deleted");
+            return result;
+
+        } finally {
+            lock.unlock();
+        }
+    }
+
     // ------------------------------------------------------------------
     // Helpers for naive query execution
     // ------------------------------------------------------------------

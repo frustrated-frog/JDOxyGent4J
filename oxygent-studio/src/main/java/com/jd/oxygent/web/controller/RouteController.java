@@ -18,8 +18,9 @@ import com.jd.oxygent.core.oxygent.schemas.oxy.OxyResponse;
 import com.jd.oxygent.core.oxygent.utils.ClassModelDumpUtils;
 import com.jd.oxygent.core.oxygent.utils.CommonUtils;
 import com.jd.oxygent.core.oxygent.utils.DataUtils;
-import com.jd.oxygent.core.oxygent.utils.JsonUtils;
 import com.jd.oxygent.web.adapter.FileItemAdapter;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -40,7 +41,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Function;
 import java.util.regex.Matcher;
@@ -441,7 +441,7 @@ public class RouteController {
             // Start event stream
             CompletableFuture.runAsync(() -> {
                 try {
-                    eventStream(redisKey, currentTraceId, task, emitter);
+                    processRedisMessage(redisKey, currentTraceId, task, emitter);
                 } catch (Exception e) {
                     log.error("Event stream failed", e);
                     emitter.completeWithError(e);
@@ -518,7 +518,7 @@ public class RouteController {
      * <p>
      * Read messages from Redis and send via SSE.
      */
-    private void eventStream(String redisKey, String currentTraceId, CompletableFuture<OxyResponse> task, SseEmitter emitter) throws Exception {
+    private void processRedisMessage(String redisKey, String currentTraceId, CompletableFuture<OxyResponse> task, SseEmitter emitter) throws Exception {
         try {
             while (true) {
                 // Read messages from Redis
@@ -915,7 +915,7 @@ public class RouteController {
     /**
      * feedback
      *
-     * @return Mas.feedbackDict.get(channelId)
+     * @return
      */
     @PostMapping("/feedback")
     public ResponseEntity<Map<String, Object>> feedback(@RequestBody Map<String, String> payload) {
@@ -937,5 +937,15 @@ public class RouteController {
             throw new RuntimeException(e);
         }
         return ResponseEntity.ok(WebResponse.success("success").toMap());
+    }
+
+    /**
+     * Get detailed agent information for frontend display.
+     *
+     * @return Mas.feedbackDict.get(channelId)
+     */
+    @PostMapping("/get_agents")
+    public ResponseEntity<Map<String, Object>> getAgents(@RequestBody Map<String, String> payload) {
+        return ResponseEntity.ok(WebResponse.success(mas.getAgentOrganization()).toMap());
     }
 }

@@ -24,6 +24,7 @@ import com.jd.oxygent.core.oxygent.infra.databases.BaseCache;
 import com.jd.oxygent.core.oxygent.infra.databases.BaseEs;
 import com.jd.oxygent.core.oxygent.infra.impl.databases.es.LocalEs;
 import com.jd.oxygent.core.oxygent.infra.impl.databases.redis.LocalCache;
+import com.jd.oxygent.core.oxygent.liveprompt.DynamicAgentManager;
 import com.jd.oxygent.core.oxygent.oxy.BaseFlow;
 import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
 import com.jd.oxygent.core.oxygent.oxy.BaseTool;
@@ -196,6 +197,7 @@ public class Mas {
      * - Initialize database connections (Elasticsearch, Redis)
      * - Set up agent organization structure
      * - Initialize vector search if configured
+     * - Setting up dynamic agents for live prompt management
      *
      * @throws RuntimeException if errors occur during initialization
      */
@@ -212,7 +214,15 @@ public class Mas {
             }
             initAgentOrganization();
             showOrg();
-            log.info("MAS system initialization completed: {}", this.name);
+            log.info("📋 OxyGent MAS Management Initialization completed: {}", this.name);
+            log.info("================================");
+            try {
+                DynamicAgentManager.setupDynamicAgents(this);
+                log.debug("Dynamic agent management initialized");
+            } catch (Exception e) {
+                log.warn("Failed to setup dynamic agents", e);
+            }
+            log.info("================================");
         } catch (Exception e) {
             log.error("MAS initialization failed: {}", e.getMessage());
             throw new RuntimeException("MAS initialization failed", e);
@@ -428,6 +438,120 @@ public class Mas {
         return root;
     }
 
+    /**
+     * Create mapping for prompt index
+     */
+    public Map<String, Object> createPromptMapping() {
+        Map<String, Object> properties = new HashMap<>();
+
+        properties.put("prompt_key", Map.of("type", "keyword"));
+        properties.put("prompt_content", Map.of(
+                "type", "text",
+                "analyzer", "standard"
+        ));
+        properties.put("description", Map.of("type", "text"));
+        properties.put("category", Map.of("type", "keyword"));
+        properties.put("agent_type", Map.of("type", "keyword"));
+        properties.put("version", Map.of("type", "integer"));
+        properties.put("is_active", Map.of("type", "boolean"));
+        properties.put("created_at", Map.of("type", "date"));
+        properties.put("updated_at", Map.of("type", "date"));
+        properties.put("created_by", Map.of("type", "keyword"));
+        properties.put("tags", Map.of("type", "keyword"));
+
+        Map<String, Object> mappings = new HashMap<>();
+        mappings.put("properties", properties);
+
+        Map<String, Object> root = new HashMap<>();
+        root.put("mappings", mappings);
+        getEsSetting(root);
+
+        return root;
+    }
+
+    /**
+     * Create mapping for prompt history index
+     */
+    public Map<String, Object> createPromptHistoryMapping() {
+        Map<String, Object> properties = new HashMap<>();
+
+        properties.put("prompt_key", Map.of("type", "keyword"));
+        properties.put("prompt_content", Map.of(
+                "type", "text",
+                "analyzer", "standard"
+        ));
+        properties.put("description", Map.of("type", "text"));
+        properties.put("category", Map.of("type", "keyword"));
+        properties.put("agent_type", Map.of("type", "keyword"));
+        properties.put("version", Map.of("type", "integer"));
+        properties.put("is_active", Map.of("type", "boolean"));
+        properties.put("is_history", Map.of("type", "boolean"));
+        properties.put("history_id", Map.of("type", "keyword"));
+        properties.put("created_at", Map.of("type", "date"));
+        properties.put("updated_at", Map.of("type", "date"));
+        properties.put("archived_at", Map.of("type", "date"));
+        properties.put("created_by", Map.of("type", "keyword"));
+        properties.put("tags", Map.of("type", "keyword"));
+
+        Map<String, Object> mappings = new HashMap<>();
+        mappings.put("properties", properties);
+
+        Map<String, Object> root = new HashMap<>();
+        root.put("mappings", mappings);
+        getEsSetting(root);
+
+        return root;
+    }
+
+    /**
+     * Create mapping for rating index
+     */
+    public Map<String, Object> createRatingMapping() {
+        Map<String, Object> properties = new HashMap<>();
+
+        properties.put("rating_id", Map.of("type", "keyword"));
+        properties.put("trace_id", Map.of("type", "keyword"));
+        properties.put("rating_type", Map.of("type", "keyword"));
+        properties.put("user_id", Map.of("type", "keyword"));
+        properties.put("user_ip", Map.of("type", "ip"));
+        properties.put("comment", Map.of("type", "text"));
+        properties.put("erp", Map.of("type", "keyword"));
+        properties.put("create_time", Map.of("type", "keyword"));
+        properties.put("update_time", Map.of("type", "keyword"));
+
+        Map<String, Object> mappings = new HashMap<>();
+        mappings.put("properties", properties);
+
+        Map<String, Object> root = new HashMap<>();
+        root.put("mappings", mappings);
+        getEsSetting(root);
+
+        return root;
+    }
+
+    /**
+     * Create mapping for rating stats index
+     */
+    public Map<String, Object> createRatingStatsMapping() {
+        Map<String, Object> properties = new HashMap<>();
+
+        properties.put("trace_id", Map.of("type", "keyword"));
+        properties.put("like_count", Map.of("type", "integer"));
+        properties.put("dislike_count", Map.of("type", "integer"));
+        properties.put("total_ratings", Map.of("type", "integer"));
+        properties.put("satisfaction_rate", Map.of("type", "float"));
+        properties.put("last_updated", Map.of("type", "keyword"));
+
+        Map<String, Object> mappings = new HashMap<>();
+        mappings.put("properties", properties);
+
+        Map<String, Object> root = new HashMap<>();
+        root.put("mappings", mappings);
+        getEsSetting(root);
+
+        return root;
+    }
+
     private void getEsSetting(Map mappings) {
         Map setting = new HashMap();
         if (Config.getEsSettings().getNumberOfShards() != null) {
@@ -450,14 +574,14 @@ public class Mas {
 
             if (this.esClient instanceof BaseEs) {
                 BaseEs es = this.esClient;
-                String indexNameTrace = Config.getAppName() + "_trace";
-                es.createIndex(indexNameTrace, createTraceMapping());
-                String indexNameNode = Config.getAppName() + "_node";
-                es.createIndex(indexNameNode, createNodeMapping());
-                String indexNameHistory = Config.getAppName() + "_history";
-                es.createIndex(indexNameHistory, createHistoryMapping());
-                String indexNameMessage = Config.getAppName() + "_message";
-                es.createIndex(indexNameMessage, createMessageMapping());
+                es.createIndex(Config.getAppName() + "_trace", createTraceMapping());
+                es.createIndex(Config.getAppName() + "_node", createNodeMapping());
+                es.createIndex(Config.getAppName() + "_history", createHistoryMapping());
+                es.createIndex(Config.getAppName() + "_message", createMessageMapping());
+                es.createIndex(Config.getAppName() + "_prompt", createPromptMapping());
+                es.createIndex(Config.getAppName() + "_prompt_history", createPromptHistoryMapping());
+                es.createIndex(Config.getAppName() + "_rating", createRatingMapping());
+                es.createIndex(Config.getAppName() + "_rating_stats", createRatingStatsMapping());
             }
 
             if (this.redisClient == null) {
@@ -515,6 +639,12 @@ public class Mas {
                     toolNameList.add(toolName);
                 }
             }
+            List<String> permittedOxyList = agent.getPermittedOxy();
+            if (permittedOxyList != null) {
+                for (String oxyName : permittedOxyList) {
+                    toolNameList.add(oxyName);
+                }
+            }
 
             addTools(children, toolNameList, tempPath);
 
@@ -537,6 +667,8 @@ public class Mas {
     public class AgentNode {
         private String name;
         private String type;
+        private String desc;
+        private String path;
         private List<AgentNode> children = new ArrayList<>();
 
         public AgentNode() {

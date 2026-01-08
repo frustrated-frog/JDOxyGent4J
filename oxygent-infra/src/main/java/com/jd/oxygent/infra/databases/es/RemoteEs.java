@@ -10,6 +10,7 @@ import org.elasticsearch.action.admin.indices.get.GetIndexRequest;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
+import org.elasticsearch.action.delete.DeleteRequest;
 import org.elasticsearch.action.get.GetRequest;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
@@ -447,6 +448,50 @@ public class RemoteEs extends BaseDB implements BaseEs {
         searchRequest.source(sourceBuilder);
 
         return executeSearchRequest(searchRequest, "RemoteEs.termQueryBySearchRequest");
+    }
+
+    @Override
+    public Map<String, Object> delete(String indexName, String docId) {
+        BulkRequest request = new BulkRequest();
+        try {
+            // Parameter validation
+            validateIndexName(indexName, "delete");
+            validateDocId(docId, "delete");
+            request.add(new DeleteRequest(indexName, docId));
+            // Execute bulk operation
+            BulkResponse bulkResponse = esConfiguration.getClient().bulk(request, RequestOptions.DEFAULT);
+            // Check bulk operation result
+            if (bulkResponse.hasFailures()) {
+                log.error("Bulk index operation contains failures: {}", bulkResponse.buildFailureMessage());
+                StringBuilder errorMessage = new StringBuilder();
+                // Log each failed document in detail
+                for (BulkItemResponse bulkItemResponse : bulkResponse) {
+                    if (bulkItemResponse.isFailed()) {
+                        BulkItemResponse.Failure failure = bulkItemResponse.getFailure();
+                        errorMessage.append(String.format("Document indexing failed - ID: %s, reason: %s, status: %s", failure.getId(), failure.getMessage(), failure.getStatus()));
+                    }
+                }
+                log.error(errorMessage.toString());
+                return Map.of(
+                        "_id", docId,
+                        "result", errorMessage.toString()
+                );
+            }
+            log.info("Successfully deleted {} documents from index [{}]", bulkResponse.getItems().length, indexName);
+            return Map.of(
+                    "_id", docId,
+                    "result", "deleted"
+            );
+
+        } catch (Exception e) {
+            log.error("Unknown exception occurred during bulk delete operation: {}", e.getMessage(), e);
+            return handleException(e, "delete");
+        } finally {
+            // Cleanup resources (if needed)
+            if (request != null) {
+                log.debug("Bulk delete completed; request contains {} operations", request.numberOfActions());
+            }
+        }
     }
 
     /**

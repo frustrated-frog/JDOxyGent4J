@@ -84,6 +84,9 @@ public class Config {
     private static AgentConfig agent = new AgentConfig();
     private static FileConfig xfile = new FileConfig();
     private static VearchConfig vearch = new VearchConfig();
+    private static OxyConfig oxy = new OxyConfig();
+    private static ToolConfig tool = new ToolConfig();
+    private static LivePromptConfig livePrompt = new LivePromptConfig();
 
     static {
         loadConfigFile();
@@ -223,7 +226,8 @@ public class Config {
                 ),
                 "required", List.of("query")
         );
-        private int maxMemoryRounds = 5;
+        private int shortMemorySize = 10;
+        private String welcomeMessage = "Hi, I’m OxyGent. How can I assist you?";
     }
 
     /**
@@ -310,6 +314,30 @@ public class Config {
     @Data
     public static class VearchConfig {
         private boolean enabled = false;
+    }
+
+    @Data
+    public static class OxyConfig {
+        private int semaphore = 1024;
+        private int timeout = 3600; // ms
+        private int retries = 2;
+        private double delay = 2.0;
+    }
+
+    @Data
+    public static class ToolConfig {
+        private boolean mcpIsKeepAlive = true;
+        private boolean isConcurrentInit = true;
+        private int semaphore = 1024;
+        private int timeout = 60; // second
+    }
+
+    @Data
+    public static class LivePromptConfig {
+        /**
+         * ES polling interval in seconds for version sync
+         */
+        private int esPollingInterval = 2;
     }
 
     public static Map getLlmConfigMap() {
@@ -413,4 +441,27 @@ public class Config {
         return configFileEnv;
     }
 
+    public static OxyConfig getOxy() {
+        return oxy;
+    }
+
+    public static void setOxy(OxyConfig oxy) {
+        Config.oxy = oxy;
+    }
+
+    public static ToolConfig getTool() {
+        return tool;
+    }
+
+    public static void setTool(ToolConfig tool) {
+        Config.tool = tool;
+    }
+
+    public static LivePromptConfig getLivePrompt() {
+        return livePrompt;
+    }
+
+    public static void setLivePrompt(LivePromptConfig livePrompt) {
+        Config.livePrompt = livePrompt;
+    }
 }

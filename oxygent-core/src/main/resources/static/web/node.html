@@ -1,38 +1,33 @@
 <!DOCTYPE html>
-<!--
- * @author OxyGent Team
- * @version 1.0.0
- * @since 1.0.0
- -->
 <html>
 <head>
     <meta charset="utf-8">
-    <!-- Force no-cache meta tags -->
+    <!-- 强制不缓存的 meta 标签 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <link rel="shortcut icon" href="image/group-favicon.png" type="image/x-icon">
+    <link rel="shortcut icon" href="./image/group-favicon.png" type="image/x-icon">
     <title>Node Visualization</title>
-    <link href="css/normalize.css?time=2" rel="stylesheet">
-    <link href="css/node.css?time=2" rel="stylesheet">
-    <link href="css/style_load1.css?time=2" rel="stylesheet">
-    <link href="css/main.css?time=2" rel="stylesheet">
-    <link href="css/gantt.css?time=2" rel="stylesheet">
-    <link href="css/flowchart_view1.css?time=2" rel="stylesheet">
+    <link href="./css/normalize.css?time=2" rel="stylesheet">
+    <link href="./css/node.css?time=2" rel="stylesheet">
+    <link href="./css/style_load1.css?time=2" rel="stylesheet">
+    <link href="./css/main.css?time=2" rel="stylesheet">
+    <link href="./css/gantt.css?time=2" rel="stylesheet">
+    <link href="./css/flowchart_view1.css?time=2" rel="stylesheet">
 
     <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
-    <script src="js/marked.min.js?time=2"></script>
-    <script src="js/mermaid.min.js?time=2"></script>
+    <script src="./js/marked.min.js?time=2"></script>
+    <script src="./js/mermaid.min.js?time=2"></script>
 
-    <script src="js/mermaid-sdk-gantt.js?time=2"></script>
-    <script src="js/utils.js?time=2"></script>
-    <script src='js/autosize.js?time=2'></script>
-    <script src="js/flowchart.js?time=2"></script>
+    <script src="./js/mermaid-sdk-gantt.js?time=2"></script>
+    <script src="./js/utils.js?time=2"></script>
+    <script src='./js/autosize.js?time=2'></script>
+    <script src="./js/flowchart.js?time=2"></script>
 </head>
 <body>
 
 <div class="node-warpper">
-    <!-- This part needs sticky scroll -->
+    <!-- 这部分要滚动吸顶 -->
     <div class="node-container-top">
     <div id="node-node-map" class="card">
         <div class="node-node-map-container">
@@ -96,15 +91,15 @@
                 </div>
                 <div class="mod-header-operation">
                     <button class="mod-header-operation-btn" id="pre" onclick="pre()">
-                        <img src="image/arrow-left.svg" alt="">
+                        <img src="./image/arrow-left.svg" alt="">
                         Pre
                     </button>
                     <button class="mod-header-operation-btn" id="next" onclick="next()">
-                        <img src="image/arrow-right.svg" alt="">
+                        <img src="./image/arrow-right.svg" alt="">
                         Next
                     </button>
                     <button class="mod-header-operation-btn" id="call_llm" onclick="call_llm()">
-                        <img src="image/refresh.svg" alt="">
+                        <img src="./image/refresh.svg" alt="">
                         Regenerate
                     </button>
                 </div>
@@ -157,8 +152,12 @@
     ];
 
     const typeMap = {
-        tool: './image/org_tool.svg',
         llm: './image/org_model.svg',
+        tool: './image/org_tool.svg',
+        model: './image/org_model.svg',
+        flow: './image/org_flow.svg',
+        bank: './image/org_knowledge.svg',
+        memory_bank: './image/org_memory.svg',
     };
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -168,7 +167,7 @@
     var plan_data = {};
 
     (function () {
-    // Use sessionStorage to avoid refresh infinite loop
+    // 使用 sessionStorage 避免刷新死循环
     if (!sessionStorage.getItem('page_refreshed')) {
         sessionStorage.setItem('page_refreshed', '1');
     }
@@ -200,7 +199,7 @@
 
         $.ajax({
             type: "GET",
-            url: "../node",
+            url: "../node/",
             data: {
                 item_id: plan_id
             },
@@ -220,7 +219,7 @@
                 } else {
                     $("#next").prop("disabled", false);
                 }
-                // Display image
+                // 展示图像
                 let img = '';
                 if (plan_data.node_type === 'agent' || plan_data.node_type === 'flow') {
                     const idx = agent_id_dict[plan_data.callee] % 16;
@@ -233,18 +232,18 @@
                 $("#avatarEmojiId").append(img);
 
 
-                // Display node base info
+                // 展示node base info
                 $("#node_caller").text(plan_data.caller);
                 $("#node_callee").text(plan_data.callee);
                 $("#node_create_time").text(plan_data.create_time);
                 $("#messages").empty();
-                // Display parameters class_attr, need to display multiple parameters
+                // 展示参数class_attr  需要展示多个参数
 
                 if (plan_data.input.class_attr) {
                     Object.entries(plan_data.input.class_attr).forEach(([key, value]) => {
                         const typeValue = getType(value);
                         
-                        // If it's a string, render directly
+                        // 如果是字符串，直接渲染那
                         if (typeValue === "boolean") {
                             var numberHtml = value ? `
                              <div class="cnt-switch">
@@ -315,7 +314,7 @@
                     });
                 }
 
-                // Display messages
+                // 展示messages
                 if (plan_data && plan_data.input && plan_data.input.arguments) {
                     Object.entries(plan_data.input.arguments).forEach(([key, value]) => {
                         const typeValue = getType(value);
@@ -335,12 +334,11 @@
                         if (typeValue === "array") {
                             const argumentPrekey = key;
                             value.forEach(({role, content}) => {
-                                var jsonContent= JSON.stringify(content);
                                 var stringHtml = `
                                     <div class="mod-right-cnt_col">
                                         <label class="text_x_6">${role}:</label>
                                         <div class="mod-right-text_x_8_wrap">
-                                            <textarea data-pre-key="${argumentPrekey}" data-key="${key}" data-type="${typeValue}" data-role="${role}" rows="4" cols="50" id="${role}"  placeholder="None" class="text_x_8">${jsonContent}</textarea>
+                                            <textarea data-pre-key="${argumentPrekey}" data-key="${key}" data-type="${typeValue}" data-role="${role}" rows="4" cols="50" id="${role}"  placeholder="None" class="text_x_8">${content}</textarea>
                                         </div>
                                     </div>
                                 `
@@ -351,12 +349,12 @@
                 }
                 autosize(document.querySelectorAll('textarea'));
 
-                // Display plan basic information
+                // 展示plan基本信息
                 $("#node_type").text(plan_data.node_type);
                 $("#trace_id").text('trace_id: ' + plan_data.trace_id);
                 $("#llm_result_new").empty();
 
-                // Display results
+                // 展示结果
 
                 var _resutData = renderPlayGround(plan_data)
                 $("#llm_result").html(_resutData);
@@ -374,14 +372,14 @@
         const url = new URL(window.location.href);
         const params = new URLSearchParams(url.search);
 
-        // If parameter exists, update its value; otherwise, add new parameter
+        // 如果参数已存在，则更新其值；否则，添加新参数
         if (params.has(paramName)) {
             params.set(paramName, paramValue);
         } else {
             params.append(paramName, paramValue);
         }
 
-        // Use pushState() to update URL, avoid page refresh
+        // 使用 pushState() 更新 URL，避免页面刷新
         const newUrl = `${url.origin}${url.pathname}?${params.toString()}${url.hash}`;
         window.history.pushState({path: newUrl}, '', newUrl);
     }
@@ -397,14 +395,14 @@
         get_plan(next_id);
     }
 
-    // Regeneration logic
+    // 重新生成逻辑
     function call_llm() {
         $("#llm_result_new").empty();
 
-        // Add loading effect
+        // 增加loading效果
         $("#llm_result_new").html('<div class="loading"> <span></span> <span></span> <span></span> <span></span> <span></span> </div>');
-        // Disable click effect
-        $("#call_llm").html('<img src="image/refresh.svg" alt=""> Planning').prop("disabled", true);
+        // 不可点击效果
+        $("#call_llm").html('<img src="./image/refresh.svg" alt=""> planning').prop("disabled", true);
 
 
         var class_attrData = {};
@@ -423,13 +421,9 @@
             }
             if (type === "object") {
                 const preType = $($input).attr('data-pre-key');
-                if (!class_attrData[preType]) {
-                    class_attrData[preType] = {
-                       [key]: $($input).val(),
-                    };
-                }else{
-                    class_attrData[preType][key] = $($input).val();
-                }
+                class_attrData[preType] = {
+                    [key]: $($input).val(),
+                };
             }
         })
 
@@ -497,7 +491,7 @@
 
                 $("#llm_result_new").empty();
                 $("#llm_result_new").html(htmlData);
-                $("#call_llm").html('<img src="image/refresh.svg" alt=""> Regenerate').prop("disabled", false);
+                $("#call_llm").html('<img src="./image/refresh.svg" alt=""> Regenerate').prop("disabled", false);
             }
         })
     }
@@ -526,11 +520,11 @@
     }
 
 
-    // Initialize Mermaid
+    // 初始化 Mermaid
     mermaid.initialize({
         theme: 'mermaid',
         themeVariables: {
-            'curve': 'stepAfter'  // Use right-angle connection lines
+            'curve': 'stepAfter'  // 使用直角连接线
         },
         startOnLoad: false,
         flowchart: {
@@ -553,11 +547,11 @@
     getViews()
     var ViewsDatas = []
 
-    //  Get global nodes
+    //  获取全局节点
     function getViews() {
         $.ajax({
             type: "GET",
-            url: "../view",
+            url: "../view/",
             data: {
                 item_id: param_id
             },
@@ -575,7 +569,7 @@
         $('#argumentsId').empty();
     }
 
-    //  Handle gantt click events
+    //  处理gantt点击事件
     function renderGanttClick(v) {
         // resetHtmlEmpty()
         // get_plan(v)
@@ -584,7 +578,7 @@
     function renderGanttClickHighlight(id, tagName = 'rect') {
         let server_id = null;
         if (tagName === 'rect') {
-            // Remove selected styles from all nodes
+            // 移除所有节点的选中样式
             document.querySelectorAll('.task').forEach(node => {
                 if (node.id === id) {
                     node.classList.add('mermaid-selected');
@@ -593,7 +587,7 @@
                 }
             });
 
-            // Remove selected text styles from all nodes
+            // 移除所有节点的选中文本样式
             document.querySelectorAll('.taskText').forEach(node => {
                 if (node.id === `${id}-text`) {
                     node.classList.add('mermaid-selected-text');
@@ -603,7 +597,7 @@
             });
             server_id = id;
         }else if (tagName === 'text') {
-            // Remove selected styles from all nodes
+            // 移除所有节点的选中样式
             document.querySelectorAll('.task').forEach(node => {
                 if (node.id === id.replace('-text', '')) {
                     node.classList.add('mermaid-selected');
@@ -611,7 +605,7 @@
                     node.classList.remove('mermaid-selected');
                 }
             });
-            // Remove selected text styles from all nodes
+            // 移除所有节点的选中文本样式
             document.querySelectorAll('.taskText').forEach(node => {
                 if (node.id === id) {
                     node.classList.add('mermaid-selected-text');
@@ -639,8 +633,8 @@
 
 
     $(".tabs .tab-item").click(function () {
-        // Chained programming operations
-        // 2. Get the index number of current li when clicking
+        // 链式编程操作
+        // 2.点击的同时，得到当前li 的索引号
         var index = $(this).attr('data-id');
         $(this).addClass("tab-text-active").siblings().removeClass("tab-text-active");
 
@@ -658,7 +652,7 @@
                 renderGanttClickHighlight(param_id, 'rect');    
             }, 100);
         }
-        // 3. Show the item with corresponding index number at the bottom, hide other items
+        // 3.让下部里面相应索引号的item显示，其余的item隐藏
     });
 
 
@@ -677,7 +671,7 @@
         }
     }
 
-    // Flowchart selection logic
+    // 流程图选中逻辑
     $('#flowchart-container').on('click', function (event) {
         let aimDom = $(event.target);
         let id = null;
@@ -695,19 +689,19 @@
         }
     });
 
-    // Dynamically adjust the height of modLeftClassAttrId
+    // 动态调整modLeftClassAttrId的高度
     adjustModLeftHeight('modLeftClassAttrId')
     adjustModLeftHeight('rightArgumentsId')
     // adjustModLeftHeight('rightPlayGroundId')
     function adjustModLeftHeight(id) {
         const modLeftClassAttrId = document.getElementById(id);
-        // Get the distance from current node to the top
+        // 获取当前节点的距离顶部的高度
         const currentTop = modLeftClassAttrId.offsetTop;
-        // Get current window height
+        // 获取当前窗口的高度
         const windowHeight = window.innerHeight;
-        // Calculate available height
+        // 计算可用高度
         const availableHeight = windowHeight - currentTop - 35;
-        // Set height
+        // 设置高度
         modLeftClassAttrId.style.height = availableHeight + 'px';
         modLeftClassAttrId.style.overflow = 'auto';
     }

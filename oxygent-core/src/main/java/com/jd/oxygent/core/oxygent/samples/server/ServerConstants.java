@@ -47,7 +47,6 @@ public final class ServerConstants {
             "default.html"
     );
 
-
     public static final Map<String, String> ROUTE_MAPPING = new HashMap<>() {{
         this.put("/", "RouteServlet");
         this.put("/check_alive", "RouteServlet");
@@ -65,6 +64,11 @@ public final class ServerConstants {
         this.put("/call", "RouteServlet");
         this.put("/upload", "RouteServlet");
         this.put("/feedback", "RouteServlet");
+        this.put("/api/prompts/*", "RouteServlet");
+        this.put("/get_agents", "RouteServlet");
+        this.put("/rating/*", "RouteServlet");
+        this.put("/history_with_ratings", "RouteServlet");
+        this.put("/analytics/ratings", "RouteServlet");
     }};
     public static final List<String> WEBAPP_RESOURCE_DIR_PATHS = List.of(
             "webapp",

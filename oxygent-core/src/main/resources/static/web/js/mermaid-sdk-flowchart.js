@@ -1,14 +1,7 @@
 
 
-/**
- * Mermaid SDK for Flowchart Generation
- * @author OxyGent Team
- * @version 1.0.0
- * @since 1.0.0
- */
-
 function convertAgentFlowToMermaidWithSubgraphs(nodes) {
-        // Node type to style mapping
+        // 节点类型到样式的映射
         const nodeTypeStyles = {
             'user': 'fill:#6f6,stroke:#333',
             'agent': 'fill:#bbf,stroke:#333',
@@ -18,7 +11,7 @@ function convertAgentFlowToMermaidWithSubgraphs(nodes) {
             'subgraph': 'fill:#eee,stroke:#666,stroke-dasharray:5 5'
         };
 
-        // Store all elements
+        // 存储所有元素
         const elements = {
             nodeDefinitions: [],
             connections: [],
@@ -26,14 +19,14 @@ function convertAgentFlowToMermaidWithSubgraphs(nodes) {
             subgraphs: {}
         };
 
-        // Store processed node IDs
+        // 存储已处理的节点ID
         const processedNodes = new Set();
 
-        // Find root node
+        // 找到根节点
         const rootNode = nodes.find(node => !node.father_node_id && node.caller === 'user') || nodes[0];
-        if (!rootNode) throw new Error('Root node not found');
+        if (!rootNode) throw new Error('找不到根节点');
 
-        // Build subgraph hierarchy
+        // 构建子图层级关系
         function buildSubgraphHierarchy() {
             const hierarchy = {};
 
@@ -53,7 +46,7 @@ function convertAgentFlowToMermaidWithSubgraphs(nodes) {
             return hierarchy;
         }
 
-        // Get parent subgraph
+        // 获取父级子图
         function getParentSubgraph(subgraph, nodes) {
             const parts = subgraph.split('.');
             if (parts.length > 1) {
@@ -62,15 +55,15 @@ function convertAgentFlowToMermaidWithSubgraphs(nodes) {
             return null;
         }
 
-        // Process node
+        // 处理节点
         function processNode(node, currentSubgraph = null) {
             if (processedNodes.has(node.node_id)) return;
             processedNodes.add(node.node_id);
 
-            // Determine node display properties
+            // 确定节点显示属性
             const {displayName, nodeType} = getNodeDisplayInfo(node);
 
-            // Special handling for output nodes
+            // 如果是输出节点特殊处理
             if (node.node_id === nodes[nodes.length - 1].node_id) {
                 const outputContent = formatOutputContent(node.output);
                 elements.nodeDefinitions.push(`${node.node_id}["${outputContent}"]`);
@@ -78,18 +71,18 @@ function convertAgentFlowToMermaidWithSubgraphs(nodes) {
                 return;
             }
 
-            // Add node definition
+            // 添加节点定义
             elements.nodeDefinitions.push(`${node.node_id}["${displayName}"]`);
             elements.styleDefinitions.push(`class ${node.node_id} ${nodeType}`);
 
-            // Process child nodes
+            // 处理子节点
             processChildNodes(node, currentSubgraph);
 
-            // Process post nodes
+            // 处理后续节点
             processPostNodes(node, currentSubgraph);
         }
 
-        // Get node display information
+        // 获取节点显示信息
         function getNodeDisplayInfo(node) {
             let displayName, nodeType;
 
@@ -107,18 +100,18 @@ function convertAgentFlowToMermaidWithSubgraphs(nodes) {
                 nodeType = 'agent';
             }
 
-            // Shorten overly long display names
+            // 缩短过长的显示名称
             displayName = displayName.length > 15 ?
                 `${displayName.substring(0, 12)}...` : displayName;
 
             return {displayName, nodeType};
         }
 
-        // Format output content
+        // 格式化输出内容
         function formatOutputContent(output) {
-            if (!output) return 'Output Result';
+            if (!output) return '输出结果';
 
-            // Extract key information or simplify output
+            // 提取关键信息或简化输出
             const maxLength = 50;
             if (output.length > maxLength) {
                 const firstLine = output.split('\n')[0];
@@ -127,23 +120,23 @@ function convertAgentFlowToMermaidWithSubgraphs(nodes) {
             return output.replace(/\n/g, '<br/>');
         }
 
-        // Process child nodes
+        // 处理子节点
         function processChildNodes(node, currentSubgraph) {
             if (node.child_node_ids && node.child_node_ids.length > 0) {
                 node.child_node_ids.forEach(childId => {
                     const childNode = nodes.find(n => n.node_id === childId);
                     if (childNode) {
-                        // Check if child node belongs to different subgraph
+                        // 检查子节点是否属于不同子图
                         if (childNode.subgraph !== currentSubgraph) {
-                            // If child node has subgraph but current doesn't, create subgraph connection first
+                            // 如果子节点有子图而当前没有，先创建子图连接
                             if (childNode.subgraph && !currentSubgraph) {
                                 elements.connections.push(`${node.node_id} --> ${childNode.subgraph}`);
                             }
-                            // If current is in subgraph but child node isn't, connect to subgraph exit
+                            // 如果当前在子图中而子节点不在，连接到子图出口
                             else if (currentSubgraph && !childNode.subgraph) {
                                 elements.connections.push(`${currentSubgraph}_exit --> ${childNode.node_id}`);
                             }
-                            // Other cases: direct connection
+                            // 其他情况直接连接
                             else {
                                 elements.connections.push(`${node.node_id} --> ${childNode.node_id}`);
                             }
@@ -157,21 +150,21 @@ function convertAgentFlowToMermaidWithSubgraphs(nodes) {
             }
         }
 
-        // Process post nodes
+        // 处理后续节点
         function processPostNodes(node, currentSubgraph) {
             if (node.post_node_ids && node.post_node_ids.length > 0) {
                 node.post_node_ids.forEach(postId => {
                     const postNode = nodes.find(n => n.node_id === postId);
                     if (postNode) {
-                        // Connection within same subgraph
+                        // 同子图内连接
                         if (postNode.subgraph === currentSubgraph) {
                             elements.connections.push(`${node.node_id} --> ${postNode.node_id}`);
                         }
-                        // Cross-subgraph connection
+                        // 跨子图连接
                         else if (currentSubgraph && !postNode.subgraph) {
                             elements.connections.push(`${currentSubgraph}_exit --> ${postNode.node_id}`);
                         }
-                        // Other cases
+                        // 其他情况
                         else {
                             elements.connections.push(`${node.node_id} --> ${postNode.node_id}`);
                         }
@@ -182,19 +175,19 @@ function convertAgentFlowToMermaidWithSubgraphs(nodes) {
             }
         }
 
-        // Build subgraph structure
+        // 构建子图结构
         function buildSubgraphs() {
             const hierarchy = buildSubgraphHierarchy();
 
-            // Build subgraphs by hierarchy
+            // 按层级构建子图
             Object.entries(hierarchy).forEach(([subgraphName, {nodes: subgraphNodes}]) => {
                 const parent = hierarchy[subgraphName].parent;
                 const subgraphId = subgraphName.replace(/\./g, '_');
 
-                // Subgraph start
+                // 子图开始
                 let subgraphDef = `    subgraph ${subgraphId}["${subgraphName}"]\n`;
 
-                // Add nodes within subgraph
+                // 添加子图内节点
                 subgraphNodes.forEach(nodeId => {
                     const node = nodes.find(n => n.node_id === nodeId);
                     if (node) {
@@ -202,19 +195,19 @@ function convertAgentFlowToMermaidWithSubgraphs(nodes) {
                     }
                 });
 
-                // Add subgraph entry and exit
+                // 添加子图入口和出口
                 subgraphDef += `      ${subgraphId}_entry[ ]:::invisible\n`;
                 subgraphDef += `      ${subgraphId}_exit[ ]:::invisible\n`;
                 subgraphDef += `    end\n`;
 
-                // Store subgraph definition
+                // 存储子图定义
                 elements.subgraphs[subgraphName] = subgraphDef;
 
-                // Add subgraph style
+                // 添加子图样式
                 elements.styleDefinitions.push(`class ${subgraphId} subgraph`);
             });
 
-            // Build subgraph connection relationships
+            // 构建子图连接关系
             Object.entries(hierarchy).forEach(([subgraphName, {parent}]) => {
                 const subgraphId = subgraphName.replace(/\./g, '_');
 
@@ -225,36 +218,36 @@ function convertAgentFlowToMermaidWithSubgraphs(nodes) {
             });
         }
 
-        // Main processing flow
+        // 主处理流程
         buildSubgraphs();
         processNode(rootNode, rootNode.subgraph || null);
 
-        // Build final Mermaid code
+        // 构建最终的 Mermaid 代码
         let mermaidCode = `%%{init: {'theme': 'base', 'themeVariables': {'curve': 'stepAfter'}}}%%\n`;
         mermaidCode += `flowchart LR\n`;
 
-        // Add invisible node styles
+        // 添加不可见节点样式
         mermaidCode += `    classDef invisible fill:none,stroke:none,color:transparent\n\n`;
 
-        // Add subgraph definitions
+        // 添加子图定义
         Object.values(elements.subgraphs).forEach(subgraphDef => {
             mermaidCode += subgraphDef + '\n';
         });
 
-        // Add node definitions
-        mermaidCode += `    %% Node definitions\n`;
+        // 添加节点定义
+        mermaidCode += `    %% 节点定义\n`;
         elements.nodeDefinitions.forEach(def => {
             mermaidCode += `    ${def}\n`;
         });
 
-        // Add connection relationships
-        mermaidCode += `    \n    %% Connection relationships\n`;
+        // 添加连接关系
+        mermaidCode += `    \n    %% 连接关系\n`;
         elements.connections.forEach(conn => {
             mermaidCode += `    ${conn}\n`;
         });
 
-        // Add style definitions
-        // mermaidCode += `    \n    %% Style definitions\n`;
+        // 添加样式定义
+        // mermaidCode += `    \n    %% 样式定义\n`;
         // Object.entries(nodeTypeStyles).forEach(([type, style]) => {
         //     mermaidCode += `    classDef ${type} ${style}\n`;
         // });
@@ -266,12 +259,12 @@ function convertAgentFlowToMermaidWithSubgraphs(nodes) {
         return mermaidCode;
     }
 /**
- * Convert agent call data to Mermaid flowchart
- * @param {Array} nodes - Agent call node array
- * @returns {string} - Mermaid flowchart code
+ * 将代理调用数据转换为 Mermaid 流程图
+ * @param {Array} nodes - 代理调用节点数组
+ * @returns {string} - Mermaid 流程图代码
  */
 function generateFlowchart(nodes) {
-    // Node type to style mapping
+    // 节点类型到样式的映射
     const nodeTypeStyles = {
         'user': 'fill:#6f6,stroke:#333',
         'agent': 'fill:#bbf,stroke:#333',
@@ -280,27 +273,27 @@ function generateFlowchart(nodes) {
         'output': 'fill:#fff,stroke:#333'
     };
 
-    // Store all node definitions
+    // 存储所有节点定义
     const nodeDefinitions = [];
-    // Store all connection relationships
+    // 存储所有连接关系
     const connections = [];
-    // Store style definitions
+    // 存储样式定义
     const styleDefinitions = [];
-    // Store processed node IDs to avoid duplication
+    // 存储已处理的节点ID，避免重复
     const processedNodes = new Set();
 
-    // First find root node (node without parent)
+    // 首先找到根节点（没有父节点的节点）
     const rootNode = nodes.find(node => !node.father_node_id && node.caller === 'user');
     if (!rootNode) {
-        throw new Error('Root node not found (user-initiated node)');
+        throw new Error('找不到根节点（用户发起的节点）');
     }
 
-    // Recursively process nodes
+    // 递归处理节点
     function processNode(node) {
         if (processedNodes.has(node.node_id)) return;
         processedNodes.add(node.node_id);
 
-        // Determine node type and display name
+        // 确定节点类型和显示名称
         let nodeName, nodeType;
         if (node.node_type === 'agent') {
             nodeName = node.callee || node.node_id;
@@ -313,26 +306,26 @@ function generateFlowchart(nodes) {
             nodeType = 'tool';
         } else {
             nodeName = node.node_id;
-            nodeType = 'agent'; // Default to agent type
+            nodeType = 'agent'; // 默认为代理类型
         }
 
-        // Shorten overly long node ID display
+        // 缩短过长的节点ID显示
         const displayName = nodeName.length > 15 ? `${nodeName.substring(0, 12)}...` : nodeName;
 
-        // Special handling for output nodes
+        // 如果是输出节点，特殊处理
         if (node.node_id === nodes[nodes.length - 1].node_id) {
-            const outputContent = node.output ? node.output.replace(/\n/g, '<br/>') : 'Output Result';
+            const outputContent = node.output ? node.output.replace(/\n/g, '<br/>') : '输出结果';
             nodeDefinitions.push(`${node.node_id}["${outputContent}"]`);
             styleDefinitions.push(`class ${node.node_id} output`);
             return;
         }
 
-        // Add node definition
+        // 添加节点定义
         nodeDefinitions.push(`${node.node_id}["${displayName}"]`);
-        // Add style definition
+        // 添加样式定义
         styleDefinitions.push(`class ${node.node_id} ${nodeType}`);
 
-        // Process child nodes
+        // 处理子节点
         if (node.child_node_ids && node.child_node_ids.length > 0) {
             console.log('node', node)
             node.child_node_ids.forEach(childId => {
@@ -344,7 +337,7 @@ function generateFlowchart(nodes) {
             });
         }
 
-        // Process post nodes (linear flow)
+        // 处理后续节点（线性流程）
         if (node.post_node_ids && node.post_node_ids.length > 0) {
             node.post_node_ids.forEach(postId => {
                 const postNode = nodes.find(n => n.node_id === postId);
@@ -356,28 +349,28 @@ function generateFlowchart(nodes) {
         }
     }
 
-    // Start processing from root node
+    // 从根节点开始处理
     processNode(rootNode);
 
-    // Build final Mermaid code
+    // 构建最终的 Mermaid 代码
     let mermaidCode = `%%{init: {'theme': 'base', 'themeVariables': {'curve': 'stepAfter'}}}%%\n`;
     mermaidCode += `flowchart LR\n`;
 
-    // Add node definitions
-    mermaidCode += `    %% Node definitions\n`;
+    // 添加节点定义
+    mermaidCode += `    %% 节点定义\n`;
     nodeDefinitions.forEach(def => {
         mermaidCode += `    ${def}\n`;
     });
 
-    // Add connection relationships
-    mermaidCode += `    \n    %% Connection relationships\n`;
+    // 添加连接关系
+    mermaidCode += `    \n    %% 连接关系\n`;
     console.log('connections', connections);
     connections.forEach(conn => {
         mermaidCode += `    ${conn}\n`;
     });
 
-    // Add style definitions
-    mermaidCode += `    \n    %% Style definitions\n`;
+    // 添加样式定义
+    mermaidCode += `    \n    %% 样式定义\n`;
     Object.entries(nodeTypeStyles).forEach(([type, style]) => {
         mermaidCode += `    classDef ${type} ${style}\n`;
     });
@@ -455,7 +448,7 @@ function createFlowchartFromData(nodesData) {
 
 
 
-// Render function
+// 渲染函数
 function renderFlowchart(data, containerId) {
     const code = generateFlowchart(data);
     console.log(code)
