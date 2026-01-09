@@ -69,7 +69,7 @@ public class HttpLlm extends RemoteLlm {
     private String streamOutputType = "stream";
 
     public HttpLlm(String baseUrl, String apiKey, String modelName, Duration timeout, Map<String, Object> llmParams, Map<String, String> headers) {
-        super(baseUrl, apiKey, modelName, timeout, llmParams, headers);
+        super(baseUrl, apiKey, modelName, timeout, llmParams, headers, null);
         setSaveData(true);
     }
 
@@ -87,14 +87,6 @@ public class HttpLlm extends RemoteLlm {
             }
         }
         return httpClient;
-    }
-
-    protected Map<String, String> headers(OxyRequest oxyRequest) {
-        HashMap<String, String> resultHeadMap = new HashMap<>();
-        if (MapUtils.isNotEmpty(this.headers)) {
-            resultHeadMap.putAll(this.headers);
-        }
-        return resultHeadMap;
     }
 
     /**

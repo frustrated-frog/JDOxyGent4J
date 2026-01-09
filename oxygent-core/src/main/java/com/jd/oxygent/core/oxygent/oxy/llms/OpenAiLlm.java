@@ -49,12 +49,12 @@ public class OpenAiLlm extends RemoteLlm {
     private final OkHttpClient httpClient;
 
     public OpenAiLlm(String baseUrl, String apiKey, String modelName) {
-        super(baseUrl, apiKey, modelName, null, null, null);
+        super(baseUrl, apiKey, modelName, null, null, null, null);
         this.httpClient = new OkHttpClient();
     }
 
     public OpenAiLlm(String baseUrl, String apiKey, String modelName, Integer timeout, Map<String, Object> llmParams, String name) {
-        super(baseUrl, apiKey, modelName, Duration.ofSeconds(timeout), llmParams, null);
+        super(baseUrl, apiKey, modelName, Duration.ofSeconds(timeout), llmParams, null, null);
         super.setName(name);
         OkHttpClient.Builder builder = new OkHttpClient.Builder();
         builder.connectTimeout(timeout, TimeUnit.SECONDS);
