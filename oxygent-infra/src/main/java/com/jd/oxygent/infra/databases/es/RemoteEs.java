@@ -441,8 +441,13 @@ public class RemoteEs extends BaseDB implements BaseEs {
 
         SearchSourceBuilder sourceBuilder = new SearchSourceBuilder()
                 .query(boolQuery)
-                .size(queryParams.size)
-                .sort("create_time", SortOrder.DESC);
+                .size(queryParams.size);
+
+        if (queryParams.sortList != null) {
+            queryParams.sortList.forEach(sort -> {
+                sourceBuilder.sort(sort.keySet().iterator().next(), SortOrder.fromString(sort.get(sort.keySet().iterator().next()).get("order").toString()));
+            });
+        }
 
         SearchRequest searchRequest = new SearchRequest(indexName);
         searchRequest.source(sourceBuilder);
@@ -507,6 +512,7 @@ public class RemoteEs extends BaseDB implements BaseEs {
         if (!(queryObj instanceof Map)) {
             return params;
         }
+        params.sortList = (List) body.get("sort");
 
         Map<?, ?> queryMap = (Map<?, ?>) queryObj;
         Object boolObj = queryMap.get("bool");
@@ -553,7 +559,6 @@ public class RemoteEs extends BaseDB implements BaseEs {
         if (sizeObj instanceof Integer) {
             params.size = (Integer) sizeObj;
         }
-
         return params;
     }
 
@@ -561,6 +566,7 @@ public class RemoteEs extends BaseDB implements BaseEs {
      * Query parameter wrapper class.
      */
     private static class QueryParams {
+        List<Map<String, Map<String, String>>> sortList;
         List<String> traceIdValue;
         String sessionNameValue;
         int size;

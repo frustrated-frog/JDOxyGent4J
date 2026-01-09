@@ -34,6 +34,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -897,12 +898,12 @@ public class OxyRequest implements Cloneable {
 
     /**
      * blocking get feedback stream
-     * @param finalChannelId
+     * @param channelId
      * @return
      */
-    public String getFeedbackStream(final String finalChannelId) {
+    public String getFeedbackStream(String channelId) {
         try {
-            LinkedBlockingQueue<String> feedbackQueue = Mas.feedbackDict.get(finalChannelId);
+            LinkedBlockingQueue<String> feedbackQueue = Mas.feedbackDict.get(channelId);
             StringBuilder feedback = new StringBuilder();
             String temp = null;
             while (true) {

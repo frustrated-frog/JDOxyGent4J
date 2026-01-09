@@ -62,7 +62,7 @@ public class DemoCustomHeader {
      * @return BaseOxy list containing ReAct agent
      * @throws IllegalArgumentException when configuration parameters are invalid
      */
-    @OxySpaceBean(value = "reactAgentJavaOxySpace", defaultStart = true, query = "hello")
+    @OxySpaceBean(value = "demoCustomHeader", defaultStart = true, query = "hello")
     public static List<BaseOxy> getDefaultOxySpace() {
         // Apply JDK17 var keyword and parameter validation
         var apiKey = EnvUtils.getEnv("OXY_LLM_API_KEY");

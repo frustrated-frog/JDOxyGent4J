@@ -3,9 +3,11 @@ package com.jd.oxygent.core.oxygent.liveprompt;
 import com.jd.oxygent.core.Config;
 import com.jd.oxygent.core.oxygent.infra.databases.BaseEs;
 import com.jd.oxygent.core.oxygent.infra.impl.databases.es.LocalEs;
+import com.jd.oxygent.core.oxygent.samples.server.masprovider.factory.impl.platform.spring.ApplicationContextHolder;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -32,24 +34,24 @@ public class PromptManager {
     private Map<String, Map<String, Object>> promptCache = new HashMap<>();
     private ReentrantLock cacheLock = new ReentrantLock();
 
-    @Autowired
     private BaseEs esClient;
 
     private VersionSyncCoordinator versionSyncCoordinator;
 
-    public PromptManager(String esHost, String indexName) {
+    public PromptManager(String indexName) {
         if (indexName == null) {
             this.indexName = Config.getAppName() + "_prompt";
         } else {
             this.indexName = indexName;
         }
+        esClient = ApplicationContextHolder.getBean(BaseEs.class);
         if (esClient == null) {
             esClient = new LocalEs();
         }
     }
 
     public PromptManager() {
-        this(null, null);
+        this(null);
     }
 
     public boolean savePrompt(
@@ -115,7 +117,7 @@ public class PromptManager {
                 doc.put("created_by", existing.getOrDefault("created_by", createdBy));
             } else {
                 // Create new record
-                doc.put("version", 1);
+                doc.put("version", version);
                 doc.put("created_at", Instant.now().toString());
                 doc.put("created_by", createdBy);
             }
@@ -137,7 +139,7 @@ public class PromptManager {
                 log.info("✓ Persisted to ES: {} (phase 2)", promptKey);
             } catch (Exception esError) {
                 // ES write failed - rollback cache to maintain consistency
-                log.error("ES write failed for {}: {}", promptKey, esError.getMessage());
+                log.error("ES write failed for {}: {}", promptKey, esError);
                 log.warn("Rolling back cache to previous state");
 
                 cacheLock.lock();
@@ -163,7 +165,7 @@ public class PromptManager {
 
             return true;
         } catch (Exception e) {
-            log.error("Failed to save prompt {}: {}", promptKey, e.getMessage());
+            log.error("Failed to save prompt {}: {}", promptKey, e);
             return false;
         }
     }
@@ -228,7 +230,7 @@ public class PromptManager {
                 }
             }
         } catch (Exception e) {
-            log.error("Failed to get prompt {}: {}", promptKey, e.getMessage());
+            log.error("Failed to get prompt {}: {}", promptKey, e);
             return null;
         }
     }
@@ -258,7 +260,7 @@ public class PromptManager {
             }
             return fallbackContent;
         } catch (Exception e) {
-            log.error("Failed to get prompt content {}: {}", promptKey, e.getMessage());
+            log.error("Failed to get prompt content {}: {}", promptKey, e);
             return fallbackContent;
         }
     }
@@ -349,7 +351,7 @@ public class PromptManager {
 
             return histories;
         } catch (Exception e) {
-            log.error("Failed to get prompt history for {}: {}", promptKey, e.getMessage());
+            log.error("Failed to get prompt history for {}: {}", promptKey, e);
             return new ArrayList<>();
         }
     }
@@ -545,7 +547,7 @@ public class PromptManager {
 
             return results;
         } catch (Exception e) {
-            log.error("Failed to list prompts: {}", e.getMessage());
+            log.error("Failed to list prompts: {}", e);
             return new ArrayList<>();
         }
     }
@@ -576,7 +578,7 @@ public class PromptManager {
 
             return true;
         } catch (Exception e) {
-            log.error("Failed to delete prompt {}: {}", promptKey, e.getMessage());
+            log.error("Failed to delete prompt {}: {}", promptKey, e);
             // Cache remains unchanged - consistent with ES state
             return false;
         }
@@ -653,7 +655,7 @@ public class PromptManager {
 
             return results;
         } catch (Exception e) {
-            log.error("Failed to search prompts: {}", e.getMessage());
+            log.error("Failed to search prompts: {}", e);
             return new ArrayList<>();
         }
     }
@@ -664,7 +666,7 @@ public class PromptManager {
             VersionSyncCoordinator coordinator = VersionSyncCoordinator.getInstance(this);
             coordinator.updateLocalVersion(promptKey, version);
         } catch (Exception e) {
-            log.debug("Failed to update local version tracker: {}", e.getMessage());
+            log.debug("Failed to update local version tracker: {}", e);
         }
     }
 
@@ -678,7 +680,7 @@ public class PromptManager {
                 log.info("Version synchronization started");
             }
         } catch (Exception e) {
-            log.error("Failed to start version synchronization: {}", e.getMessage());
+            log.error("Failed to start version synchronization: {}", e);
         }
     }
 
@@ -688,7 +690,7 @@ public class PromptManager {
                 versionSyncCoordinator.stop();
                 log.info("Version synchronization stopped");
             } catch (Exception e) {
-                log.error("Error stopping version synchronization: {}", e.getMessage());
+                log.error("Error stopping version synchronization: {}", e);
             }
         }
     }
@@ -712,7 +714,7 @@ public class PromptManager {
                     versionSyncStarted = true;
                     log.info("Version sync auto-started with PromptManager");
                 } catch (Exception e) {
-                    log.error("Failed to auto-start version sync: {}", e.getMessage());
+                    log.error("Failed to auto-start version sync: {}", e);
                 }
             }
             return instance;
@@ -733,7 +735,7 @@ public class PromptManager {
                     instance.close();
                     log.info("Prompt manager closed successfully");
                 } catch (Exception e) {
-                    log.error("Error closing prompt manager: {}", e.getMessage());
+                    log.error("Error closing prompt manager: {}", e);
                 } finally {
                     instance = null;
                 }
@@ -746,7 +748,7 @@ public class PromptManager {
             PromptManager manager = getInstance();
             return manager.getPromptContent(promptKey, fallbackContent, useCache);
         } catch (Exception e) {
-            log.error("Failed to get dynamic prompt {}: {}", promptKey, e.getMessage());
+            log.error("Failed to get dynamic prompt {}: {}", promptKey, e);
             return fallbackContent;
         }
     }
@@ -770,7 +772,7 @@ public class PromptManager {
                 return "";
             }
         } catch (Exception e) {
-            log.error("Failed to resolve hot prompt for {}: {}", promptKey, e.getMessage());
+            log.error("Failed to resolve hot prompt for {}: {}", promptKey, e);
             // Return default prompt or empty string on error
             return defaultPrompt != null ? defaultPrompt : "";
         }

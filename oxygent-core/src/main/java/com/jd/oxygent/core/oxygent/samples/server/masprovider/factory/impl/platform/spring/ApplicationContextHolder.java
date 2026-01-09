@@ -31,17 +31,17 @@ public class ApplicationContextHolder implements BeanDefinitionRegistryPostProce
     }
 
     public static <T> T getBean(Class<T> clazz) {
-        if (applicationContext == null) {
-            throw new IllegalStateException("ApplicationContext is not initialized yet");
+        if (applicationContext != null) {
+            return applicationContext.getBean(clazz);
         }
-        return applicationContext.getBean(clazz);
+        return null;
     }
 
     public static <T> T getBean(String name, Class<T> clazz) {
-        if (applicationContext == null) {
-            throw new IllegalStateException("ApplicationContext is not initialized yet");
+        if (applicationContext != null) {
+            return applicationContext.getBean(name, clazz);
         }
-        return applicationContext.getBean(name, clazz);
+        return null;
     }
 
     public static boolean isContextInitialized() {

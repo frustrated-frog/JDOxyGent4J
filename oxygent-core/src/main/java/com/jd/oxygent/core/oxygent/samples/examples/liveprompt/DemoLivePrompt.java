@@ -65,7 +65,6 @@ public class DemoLivePrompt {
                 ChatAgent.builder()
                         .name("chat_agent3")
                         .prompt("You are a helpful assistant.")
-                        .promptKey("my_prompt")
                         .llmModel("default_llm")
                         .userLivePrompt(false)
                         .build()
