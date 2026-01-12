@@ -34,6 +34,7 @@ import com.jd.oxygent.core.oxygent.schemas.evaluation.ConversationWithRating;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingRequest;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingResponse;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingStats;
+import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingType;
 import com.jd.oxygent.core.oxygent.schemas.memory.Memory;
 import com.jd.oxygent.core.oxygent.schemas.memory.Message;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
@@ -556,14 +557,14 @@ public class RouteServlet extends HttpServlet {
     private void feedback(HttpServletRequest request, HttpServletResponse response) throws IOException {
         Map<String, Object> payload = readRequestBody(request);
         String channelId = (String) payload.getOrDefault("channel_id", "");
-        if (!Mas.feedbackDict.containsKey(channelId)) {
+        if (!mas.feedbackDict.containsKey(channelId)) {
             sendError(response, HttpServletResponse.SC_BAD_REQUEST, "illegal channel_id: " + channelId);
         }
-        LinkedBlockingQueue<String> feedbackQueue = Mas.feedbackDict.get(channelId);
+        LinkedBlockingQueue<String> feedbackQueue = mas.feedbackDict.get(channelId);
         String data = (String) payload.getOrDefault("data", "");
         if (feedbackQueue == null) {
             feedbackQueue = new LinkedBlockingQueue<>();
-            Mas.feedbackDict.put(channelId, feedbackQueue);
+            mas.feedbackDict.put(channelId, feedbackQueue);
         }
         try {
             feedbackQueue.put(data);
@@ -1706,8 +1707,9 @@ public class RouteServlet extends HttpServlet {
      */
     private void rating(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
-            RatingRequest ratingRequest = new RatingRequest();
-            RatingResponse result = EvaluationManager.getInstance().createRating(ratingRequest, request, Optional.empty());
+            Map<String, Object> payload = readRequestBody(request);
+            RatingRequest ratingRequest = new RatingRequest((String) payload.get("trace_id"), RatingType.valueOf(((String) payload.get("rating_type")).toUpperCase()), (String) payload.get("comment"), (String) payload.get("erp"));
+            RatingResponse result = EvaluationManager.getInstance().createRating(ratingRequest, request, null);
 
             Map<String, Object> data = new HashMap<>();
             data.put("rating_id", result.getRatingId());

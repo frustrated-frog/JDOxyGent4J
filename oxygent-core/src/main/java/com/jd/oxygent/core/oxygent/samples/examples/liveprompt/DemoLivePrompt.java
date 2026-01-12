@@ -1,3 +1,18 @@
+/*
+ * Copyright 2025 JD.com
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this project except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 package com.jd.oxygent.core.oxygent.samples.examples.liveprompt;
 
 import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
@@ -34,7 +49,7 @@ public class DemoLivePrompt {
      *
      * @return List of BaseOxy containing LLM and ChatAgent
      */
-    @OxySpaceBean(value = "saveMessageJavaOxySpace", defaultStart = true, query = "hello")
+    @OxySpaceBean(value = "defaultJavaOxySpace", defaultStart = true, query = "hello")
     public static List<BaseOxy> getDefaultOxySpace() {
         var apiKey = EnvUtils.getEnv("OXY_LLM_API_KEY");
         var baseUrl = EnvUtils.getEnv("OXY_LLM_BASE_URL");
@@ -71,13 +86,6 @@ public class DemoLivePrompt {
         );
     }
 
-    /**
-     * Application main entry point
-     * Initialize ReAct agent and start Spring Boot application
-     *
-     * @param args command line arguments
-     * @throws Exception when application startup fails
-     */
     public static void main(String[] args) throws Exception {
         var currentClassName = Thread.currentThread().getStackTrace()[1].getClassName();
         GlobalDefaultOxySpaceMapping.searchCurrentThreadStackAnnotationOxySpaceName(currentClassName);

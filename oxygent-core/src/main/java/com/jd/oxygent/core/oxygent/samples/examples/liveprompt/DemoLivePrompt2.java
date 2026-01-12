@@ -58,7 +58,6 @@ public class DemoLivePrompt2 {
                         .apiKey(apiKey)
                         .baseUrl(baseUrl)
                         .modelName(modelName)
-                        .llmParams(Map.of("temperature", 0.01)) // Using Map.of to create immutable Map
                         .timeout(30)
                         .build(),
 

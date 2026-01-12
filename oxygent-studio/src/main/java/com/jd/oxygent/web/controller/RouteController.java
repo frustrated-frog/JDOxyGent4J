@@ -4,13 +4,25 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.f4b6a3.uuid.UuidCreator;
 import com.jd.oxygent.core.Config;
+import com.jd.oxygent.core.EvaluationManager;
 import com.jd.oxygent.core.Mas;
+import com.jd.oxygent.core.oxygent.liveprompt.DynamicAgentManager;
+import com.jd.oxygent.core.oxygent.liveprompt.PromptManager;
 import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
 import com.jd.oxygent.core.oxygent.samples.server.masprovider.MasFactoryRegistry;
 import com.jd.oxygent.core.oxygent.samples.server.utils.FileValidationUtil;
 import com.jd.oxygent.core.oxygent.samples.server.utils.RecursivePackageInstantiator;
-import com.jd.oxygent.core.oxygent.samples.server.vo.*;
+import com.jd.oxygent.core.oxygent.samples.server.vo.AgentNodeConverter;
+import com.jd.oxygent.core.oxygent.samples.server.vo.ItemRequest;
+import com.jd.oxygent.core.oxygent.samples.server.vo.OrganizationWrapper;
+import com.jd.oxygent.core.oxygent.samples.server.vo.ScriptRequest;
+import com.jd.oxygent.core.oxygent.samples.server.vo.WebResponse;
 import com.jd.oxygent.core.oxygent.schemas.SSEMessage;
+import com.jd.oxygent.core.oxygent.schemas.evaluation.ConversationRating;
+import com.jd.oxygent.core.oxygent.schemas.evaluation.ConversationWithRating;
+import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingRequest;
+import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingResponse;
+import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingStats;
 import com.jd.oxygent.core.oxygent.schemas.memory.Memory;
 import com.jd.oxygent.core.oxygent.schemas.memory.Message;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
@@ -20,13 +32,22 @@ import com.jd.oxygent.core.oxygent.utils.CommonUtils;
 import com.jd.oxygent.core.oxygent.utils.DataUtils;
 import com.jd.oxygent.web.adapter.FileItemAdapter;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import org.springframework.web.servlet.view.RedirectView;
@@ -39,7 +60,15 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Function;
@@ -62,6 +91,8 @@ import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.RESTRIC
 public class RouteController {
 
     private final Mas mas = MasFactoryRegistry.getFactory().createMas();
+    private final EvaluationManager evaluationManager = EvaluationManager.getInstance();
+    private final PromptManager promptManager = PromptManager.getInstance();
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -920,15 +951,15 @@ public class RouteController {
     @PostMapping("/feedback")
     public ResponseEntity<Map<String, Object>> feedback(@RequestBody Map<String, String> payload) {
         String channelId = payload.getOrDefault("channel_id", "");
-        if (!Mas.feedbackDict.containsKey(channelId)) {
+        if (!mas.feedbackDict.containsKey(channelId)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(WebResponse.error(HttpStatus.BAD_REQUEST.value(), "illegal channel_id: " + channelId).toMap());
         }
-        LinkedBlockingQueue<String> feedbackQueue = Mas.feedbackDict.get(channelId);
+        LinkedBlockingQueue<String> feedbackQueue = mas.feedbackDict.get(channelId);
         String data = payload.getOrDefault("data", "");
         if (feedbackQueue == null) {
             feedbackQueue = new LinkedBlockingQueue<>();
-            Mas.feedbackDict.put(channelId, feedbackQueue);
+            mas.feedbackDict.put(channelId, feedbackQueue);
         }
         try {
             feedbackQueue.put(data);
@@ -947,5 +978,443 @@ public class RouteController {
     @PostMapping("/get_agents")
     public ResponseEntity<Map<String, Object>> getAgents(@RequestBody Map<String, String> payload) {
         return ResponseEntity.ok(WebResponse.success(mas.getAgentOrganization()).toMap());
+    }
+
+    /**
+     * Handle rating submission
+     */
+    @PostMapping("/rating")
+    public ResponseEntity<Map<String, Object>> rating(@RequestBody Map<String, Object> requestBody, HttpServletRequest request) {
+        try {
+            RatingRequest ratingRequest = objectMapper.convertValue(requestBody, RatingRequest.class);
+            RatingResponse response = evaluationManager.createRating(ratingRequest, request, null);
+            return ResponseEntity.ok(WebResponse.success(response).toMap());
+        } catch (Exception e) {
+            log.error("Rating failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Rating failed: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get conversation history with ratings
+     */
+    @GetMapping("/history_with_ratings")
+    public ResponseEntity<Map<String, Object>> historyWithRatings(
+            @RequestParam(value = "page", defaultValue = "1") int page,
+            @RequestParam(value = "page_size", defaultValue = "20") int pageSize) {
+        try {
+            // 由于EvaluationManager没有直接提供该方法，我们返回空列表
+            List<ConversationWithRating> conversations = new ArrayList<>();
+            return ResponseEntity.ok(WebResponse.success(conversations).toMap());
+        } catch (Exception e) {
+            log.error("Get history with ratings failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to get history with ratings: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get rating analytics
+     */
+    @GetMapping("/analytics/ratings")
+    public ResponseEntity<Map<String, Object>> analyticsRatings(
+            @RequestParam(value = "days", defaultValue = "7") int days) {
+        try {
+            Map<String, Object> stats = evaluationManager.getOverallRatingStats(days);
+            return ResponseEntity.ok(WebResponse.success(stats).toMap());
+        } catch (Exception e) {
+            log.error("Get rating analytics failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to get rating analytics: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Clear all ratings
+     */
+    @PostMapping("/rating/clear_all")
+    public ResponseEntity<Map<String, Object>> clearAllRatings() {
+        try {
+            Map<String, Object> result = evaluationManager.clearAllRatingData();
+            return ResponseEntity.ok(WebResponse.success(result).toMap());
+        } catch (Exception e) {
+            log.error("Clear all ratings failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to clear all ratings: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Setup rating indices
+     */
+    @PostMapping("/rating/setup_indices")
+    public ResponseEntity<Map<String, Object>> setupRatingIndices() {
+        try {
+            Map<String, Object> result = evaluationManager.ensureRatingIndicesWithCorrectMapping();
+            return ResponseEntity.ok(WebResponse.success(result).toMap());
+        } catch (Exception e) {
+            log.error("Setup rating indices failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to setup rating indices: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Rebuild rating stats for a specific trace
+     */
+    @PostMapping("/rating/{trace_id}/rebuild_stats")
+    public ResponseEntity<Map<String, Object>> rebuildStats(@PathVariable("trace_id") String traceId) {
+        try {
+            RatingStats stats = evaluationManager.updateRatingStats(traceId, Optional.empty());
+            return ResponseEntity.ok(WebResponse.success(stats).toMap());
+        } catch (Exception e) {
+            log.error("Rebuild stats failed for trace: " + traceId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to rebuild stats: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get current rating for a trace
+     */
+    @GetMapping("/rating/{trace_id}/current")
+    public ResponseEntity<Map<String, Object>> getCurrentRating(@PathVariable("trace_id") String traceId) {
+        try {
+            Optional<RatingStats> statsOpt = evaluationManager.getRatingStats(traceId);
+            return ResponseEntity.ok(WebResponse.success(statsOpt.orElse(null)).toMap());
+        } catch (Exception e) {
+            log.error("Get current rating failed for trace: " + traceId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to get current rating: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get rating history for a trace
+     */
+    @GetMapping("/rating/{trace_id}/history")
+    public ResponseEntity<Map<String, Object>> getRatingHistory(@PathVariable("trace_id") String traceId) {
+        try {
+            List<ConversationRating> ratings = evaluationManager.getRatingHistory(traceId);
+            return ResponseEntity.ok(WebResponse.success(ratings).toMap());
+        } catch (Exception e) {
+            log.error("Get rating history failed for trace: " + traceId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to get rating history: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Delete rating for a trace
+     */
+    @DeleteMapping("/rating/{trace_id}")
+    public ResponseEntity<Map<String, Object>> deleteRating(@PathVariable("trace_id") String traceId) {
+        try {
+            evaluationManager.deleteRating(traceId);
+            return ResponseEntity.ok(WebResponse.success("Successfully deleted rating").toMap());
+        } catch (Exception e) {
+            log.error("Delete rating failed for trace: " + traceId, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to delete rating: " + e.getMessage()).toMap());
+        }
+    }
+
+    // Prompt Management API Endpoints
+
+    /**
+     * List prompts
+     */
+    @GetMapping("/api/prompts/")
+    public ResponseEntity<Map<String, Object>> listPrompts(
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "agent_type", required = false) String agentType,
+            @RequestParam(value = "is_active", required = false) Boolean isActive,
+            @RequestParam(value = "tags", required = false) String tagsStr) {
+        try {
+            List<String> tags = tagsStr != null ? Arrays.asList(tagsStr.split(",")) : null;
+            List<Map<String, Object>> prompts = promptManager.listPrompts(category, agentType, isActive, tags);
+            
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("success", true);
+            responseData.put("message", "Successfully retrieved prompt list");
+            responseData.put("data", prompts);
+            
+            return ResponseEntity.ok(responseData);
+        } catch (Exception e) {
+            log.error("List prompts failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to list prompts: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Create prompt
+     */
+    @PostMapping("/api/prompts/")
+    public ResponseEntity<Map<String, Object>> createPrompt(@RequestBody Map<String, Object> requestBody) {
+        try {
+            String promptKey = (String) requestBody.get("prompt_key");
+            String promptContent = (String) requestBody.get("prompt_content");
+            String description = (String) requestBody.getOrDefault("description", "");
+            String category = (String) requestBody.getOrDefault("category", "custom");
+            String agentType = (String) requestBody.getOrDefault("agent_type", "");
+            boolean isActive = (boolean) requestBody.getOrDefault("is_active", true);
+            List<String> tags = (List<String>) requestBody.getOrDefault("tags", new ArrayList<>());
+            String createdBy = (String) requestBody.getOrDefault("created_by", "user");
+            
+            // Check if prompt already exists
+            Map<String, Object> existing = promptManager.getPrompt(promptKey, true);
+            if (existing != null) {
+                return ResponseEntity.badRequest()
+                        .body(WebResponse.error(400, "Prompt already exists").toMap());
+            }
+            
+            boolean success = promptManager.savePrompt(promptKey, promptContent, description, category, agentType,
+                    1, isActive, tags, createdBy);
+            
+            if (!success) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(WebResponse.error(500, "Failed to create prompt").toMap());
+            }
+            
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("success", true);
+            responseData.put("message", "Successfully created prompt");
+            responseData.put("data", Map.of("prompt_key", promptKey));
+            
+            return ResponseEntity.ok(responseData);
+        } catch (Exception e) {
+            log.error("Create prompt failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to create prompt: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Search prompts
+     */
+    @GetMapping("/api/prompts/search/")
+    public ResponseEntity<Map<String, Object>> searchPrompts(
+            @RequestParam("keyword") String keyword,
+            @RequestParam(value = "category", required = false) String category) {
+        try {
+            if (keyword == null || keyword.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(WebResponse.error(400, "Keyword is required").toMap());
+            }
+            
+            List<Map<String, Object>> results = promptManager.searchPrompts(keyword, category);
+            
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("success", true);
+            responseData.put("message", "Successfully searched prompts");
+            responseData.put("data", results);
+            
+            return ResponseEntity.ok(responseData);
+        } catch (Exception e) {
+            log.error("Search prompts failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to search prompts: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Hot reload all prompts
+     */
+    @PostMapping("/api/prompts/hot-reload/all")
+    public ResponseEntity<Map<String, Object>> hotReloadAllPrompts() {
+        try {
+            boolean success = DynamicAgentManager.hotReloadAllPrompts();
+            
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("success", success);
+            responseData.put("message", "Successfully completed batch hot reload");
+            responseData.put("data", Map.of(
+                    "reload_success", success,
+                    "reload_time", LocalDateTime.now().format(DATE_TIME_FORMATTER)
+            ));
+            
+            return ResponseEntity.ok(responseData);
+        } catch (Exception e) {
+            log.error("Hot reload all prompts failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to hot reload all prompts: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Hot reload agent prompts
+     */
+    @PostMapping("/api/prompts/hot-reload/agent/{agent_name}")
+    public ResponseEntity<Map<String, Object>> hotReloadAgentPrompts(@PathVariable("agent_name") String agentName) {
+        try {
+            boolean success = DynamicAgentManager.hotReloadAgent(agentName);
+            
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("success", success);
+            responseData.put("message", "Successfully hot reloaded agent prompt");
+            responseData.put("data", Map.of(
+                    "agent_name", agentName,
+                    "hot_reload_success", success
+            ));
+            
+            return ResponseEntity.ok(responseData);
+        } catch (Exception e) {
+            log.error("Hot reload agent prompt failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to hot reload agent prompt: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Hot reload specific prompt
+     */
+    @PostMapping("/api/prompts/hot-reload/{prompt_key}")
+    public ResponseEntity<Map<String, Object>> hotReloadPrompt(@PathVariable("prompt_key") String promptKey) {
+        try {
+            boolean success = DynamicAgentManager.hotReloadPrompt(promptKey);
+            
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("success", success);
+            responseData.put("message", "Successfully hot reloaded prompt");
+            responseData.put("data", Map.of(
+                    "prompt_key", promptKey,
+                    "hot_reload_success", success
+            ));
+            
+            return ResponseEntity.ok(responseData);
+        } catch (Exception e) {
+            log.error("Hot reload prompt failed", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to hot reload prompt: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get prompt
+     */
+    @GetMapping("/api/prompts/{prompt_key}")
+    public ResponseEntity<Map<String, Object>> getPrompt(@PathVariable("prompt_key") String promptKey) {
+        try {
+            Map<String, Object> prompt = promptManager.getPrompt(promptKey, true);
+            
+            if (prompt == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            prompt.put("id", promptKey);
+            
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("success", true);
+            responseData.put("message", "Successfully retrieved prompt");
+            responseData.put("data", prompt);
+            
+            return ResponseEntity.ok(responseData);
+        } catch (Exception e) {
+            log.error("Get prompt failed: " + promptKey, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to get prompt: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Update prompt
+     */
+    @PutMapping("/api/prompts/{prompt_key}")
+    public ResponseEntity<Map<String, Object>> updatePrompt(@PathVariable("prompt_key") String promptKey,
+                                                           @RequestBody Map<String, Object> requestBody) {
+        try {
+            // Get existing prompt
+            Map<String, Object> existing = promptManager.getPrompt(promptKey, true);
+            if (existing == null) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            // Extract update data
+            String promptContent = (String) requestBody.get("prompt_content");
+            String description = (String) requestBody.getOrDefault("description", existing.getOrDefault("description", ""));
+            String category = (String) requestBody.getOrDefault("category", existing.getOrDefault("category", "custom"));
+            String agentType = (String) requestBody.getOrDefault("agent_type", existing.getOrDefault("agent_type", ""));
+            List<String> tags = (List<String>) requestBody.getOrDefault("tags", existing.getOrDefault("tags", new ArrayList<>()));
+            Boolean isActive = (Boolean) requestBody.getOrDefault("is_active", existing.getOrDefault("is_active", true));
+            
+            // Check if there are changes
+            boolean hasChanges = promptContent != null && !promptContent.equals(existing.get("prompt_content"));
+            
+            if (!hasChanges) {
+                Map<String, Object> responseData = new HashMap<>();
+                responseData.put("success", false);
+                responseData.put("message", "No changes detected; update the prompt before saving.");
+                responseData.put("data", Map.of("prompt_key", promptKey));
+                return ResponseEntity.ok(responseData);
+            }
+            
+            // Update prompt
+            boolean success = promptManager.savePrompt(promptKey, promptContent, description, category, agentType,
+                    1, isActive, tags, (String) existing.getOrDefault("created_by", "user"));
+            
+            if (!success) {
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(WebResponse.error(500, "Failed to update prompt").toMap());
+            }
+            
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("success", true);
+            responseData.put("message", "Successfully updated prompt");
+            responseData.put("data", Map.of("prompt_key", promptKey));
+            
+            return ResponseEntity.ok(responseData);
+        } catch (Exception e) {
+            log.error("Update prompt failed: " + promptKey, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to update prompt: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Delete prompt
+     */
+    @DeleteMapping("/api/prompts/{prompt_key}")
+    public ResponseEntity<Map<String, Object>> deletePrompt(@PathVariable("prompt_key") String promptKey) {
+        try {
+            boolean success = promptManager.deletePrompt(promptKey);
+            
+            if (!success) {
+                return ResponseEntity.notFound().build();
+            }
+            
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("success", true);
+            responseData.put("message", "Successfully deleted prompt");
+            responseData.put("data", Map.of("prompt_key", promptKey));
+            
+            return ResponseEntity.ok(responseData);
+        } catch (Exception e) {
+            log.error("Delete prompt failed: " + promptKey, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to delete prompt: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get prompt history
+     */
+    @GetMapping("/api/prompts/{prompt_key}/history")
+    public ResponseEntity<Map<String, Object>> getPromptHistory(@PathVariable("prompt_key") String promptKey) {
+        try {
+            List<Map<String, Object>> history = promptManager.getPromptHistory(promptKey);
+            
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("success", true);
+            responseData.put("message", "Successfully retrieved prompt history");
+            responseData.put("data", history);
+            
+            return ResponseEntity.ok(responseData);
+        } catch (Exception e) {
+            log.error("Get prompt history failed: " + promptKey, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(500, "Failed to get prompt history: " + e.getMessage()).toMap());
+        }
     }
 }

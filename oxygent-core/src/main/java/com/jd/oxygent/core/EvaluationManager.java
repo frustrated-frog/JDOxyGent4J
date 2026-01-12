@@ -87,7 +87,7 @@ public class EvaluationManager {
         }
     }
 
-    public RatingResponse createRating(RatingRequest ratingRequest, HttpServletRequest request, Optional<String> userId) {
+    public RatingResponse createRating(RatingRequest ratingRequest, HttpServletRequest request, String userId) {
         try {
             boolean traceExists = checkTraceExists(ratingRequest.getTraceId());
             if (!traceExists) {
@@ -100,7 +100,7 @@ public class EvaluationManager {
                     ratingId,
                     ratingRequest.getTraceId(),
                     ratingRequest.getRatingType(),
-                    userId.orElse(null),
+                    userId,
                     userIp,
                     ratingRequest.getComment(),
                     ratingRequest.getErp(),

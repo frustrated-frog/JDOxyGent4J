@@ -119,11 +119,11 @@ public class Mas {
     /**
      * feedback channel_id
      */
-    public static Map<String, List<String>> channelIdDict = new ConcurrentHashMap<>();
+    public Map<String, List<String>> channelIdDict = new ConcurrentHashMap<>();
     /**
      * feedback blocking queue
      */
-    public static Map<String, LinkedBlockingQueue<String>> feedbackDict = new ConcurrentHashMap<>();
+    public Map<String, LinkedBlockingQueue<String>> feedbackDict = new ConcurrentHashMap<>();
 
     private HttpClient httpClient;
 
@@ -148,7 +148,7 @@ public class Mas {
      * User's first query marker, used to implement query record saving only once, key is request_id, value is boolean
      */
     @JsonIgnore
-    public static Set firstQuerySet = ConcurrentHashMap.newKeySet();
+    public Set firstQuerySet = ConcurrentHashMap.newKeySet();
 
     /**
      * Temporarily store user query parameters, used to solve the problem of missing parameters in response when concatenating streaming answers
@@ -156,7 +156,7 @@ public class Mas {
      * value is body
      */
     @JsonIgnore
-    public static Map<Object, Map> queryParamMap = new ConcurrentHashMap();
+    public Map<Object, Map> queryParamMap = new ConcurrentHashMap();
 
     /**
      * function customization and message processing
@@ -662,7 +662,6 @@ public class Mas {
         return currentTraceId.get();
     }
 
-
     @Data
     public class AgentNode {
         private String name;
@@ -1012,8 +1011,8 @@ public class Mas {
         }
         Object requestId = JsonUtils.firstNotBlank(payload.get("request_id"), payload.get("req_id"), payload.get("requestId"));
         if (requestId != null) {
-            Mas.firstQuerySet.add(requestId);
-            Mas.queryParamMap.put(requestId, payload);
+            firstQuerySet.add(requestId);
+            queryParamMap.put(requestId, payload);
         }
 
         Object query = payload.get("query");
@@ -1413,7 +1412,7 @@ public class Mas {
      *
      * @param _copy
      */
-    public static void removeAbandonedFields(Map _copy) {
+    public void removeAbandonedFields(Map _copy) {
         Map _content = _copy;
         if (_copy.get("content") instanceof Map contentMap) {
             _content = contentMap;
@@ -1427,7 +1426,7 @@ public class Mas {
             Map _sharedData = shareddataMap;
             _sharedData.remove("_headers");
             Object requestId = JsonUtils.firstNotBlank(_content.get("request_id"), _content.get("req_id"), _content.get("requestId"));
-            if (!"tool_call".equals(_copy.get("type")) || requestId == null || !Mas.firstQuerySet.contains(requestId)) {
+            if (!"tool_call".equals(_copy.get("type")) || requestId == null || !firstQuerySet.contains(requestId)) {
                 _sharedData.remove("files");
                 _sharedData.remove("first_query_struct");
             }

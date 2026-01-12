@@ -883,27 +883,24 @@ public class OxyRequest implements Cloneable {
         this.mas.getGlobalData().put(key, value);
     }
 
-    public void initFeedbackStream(String channelId) {
-        if (channelId == null) {
-            channelId = this.currentTraceId;
-        }
-        if (!Mas.feedbackDict.containsKey(channelId)) {
-            Mas.feedbackDict.put(channelId, new LinkedBlockingQueue<>());
-            if (!Mas.channelIdDict.containsKey(currentTraceId)) {
-                Mas.channelIdDict.put(currentTraceId, new LinkedList<>());
-            }
-            Mas.channelIdDict.get(currentTraceId).add(channelId);
-        }
-    }
-
     /**
      * blocking get feedback stream
      * @param channelId
      * @return
      */
     public String getFeedbackStream(String channelId) {
+        if (channelId == null) {
+            channelId = this.currentTraceId;
+        }
+        if (!mas.feedbackDict.containsKey(channelId)) {
+            mas.feedbackDict.put(channelId, new LinkedBlockingQueue<>());
+            if (!mas.channelIdDict.containsKey(currentTraceId)) {
+                mas.channelIdDict.put(currentTraceId, new LinkedList<>());
+            }
+            mas.channelIdDict.get(currentTraceId).add(channelId);
+        }
         try {
-            LinkedBlockingQueue<String> feedbackQueue = Mas.feedbackDict.get(channelId);
+            LinkedBlockingQueue<String> feedbackQueue = mas.feedbackDict.get(channelId);
             StringBuilder feedback = new StringBuilder();
             String temp = null;
             while (true) {

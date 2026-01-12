@@ -4,7 +4,7 @@
             "name": "app",
             "version": "1.0.0",
             "biz_type": "oxygent",
-            "scan_oxygent_path": "com.jd.oxygent"
+            "scan_oxygent_path": "com.jd"
         },
         "llm": {
             "temperature": 0.1,

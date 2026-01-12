@@ -318,9 +318,9 @@ public class Config {
     @Data
     public static class OxyConfig {
         private int semaphore = 1024;
-        private int timeout = 3600; // ms
+        private double timeout = 3600; // Timeout in seconds
         private int retries = 2;
-        private double delay = 1.0;
+        private double delay = 1.0; // delay in seconds
     }
 
     @Data

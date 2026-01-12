@@ -95,28 +95,6 @@ public class DemoHumanInTheLoop {
         oxyRequest.sendMessage(Map.of("type", "msg_type", "content", "msg_content"));
 
         String channelId = "my_custom_channel_id";
-        oxyRequest.initFeedbackStream(channelId);
-
-        // simulate sending feedback
-        String url = "http://localhost:8888/feedback";
-        String jsonBody = String.format("""
-            {"channel_id": "%s", "data": "my_custom_feedback"}
-            """, channelId);
-        HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(60))
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
-        Map<String, String> requestHeaders = new HashMap<>();
-        requestHeaders.put("Content-Type", "application/json");
-        requestHeaders.forEach(requestBuilder::header);
-        HttpRequest request = requestBuilder.build();
-        try {
-            HttpResponse response = HttpLlm.getHttpClient().send(request, HttpResponse.BodyHandlers.ofInputStream());
-            log.info("response statusCode:{}", response.statusCode());
-        } catch (IOException | InterruptedException e) {
-            log.error("Error sending HTTP request", e);
-        }
-
         // blocking get feedback stream
         return oxyRequest.getFeedbackStream(channelId);
     }
@@ -130,6 +108,34 @@ public class DemoHumanInTheLoop {
      * @throws Exception When configuration loading or application startup fails
      */
     public static void main(String[] args) throws Exception {
+        // simulate sending feedback, wait 20 seconds for user operation
+        new Thread(() -> {
+            try {
+                Thread.sleep(20_000);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+            String url = "http://localhost:8888/feedback";
+            String channelId = "my_custom_channel_id";
+            String jsonBody = String.format("""
+            {"channel_id": "%s", "data": "my_custom_feedback"}
+            """, channelId);
+            try {
+                HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                        .uri(URI.create(url))
+                        .timeout(Duration.ofSeconds(60))
+                        .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
+                Map<String, String> requestHeaders = new HashMap<>();
+                requestHeaders.put("Content-Type", "application/json");
+                requestHeaders.forEach(requestBuilder::header);
+                HttpRequest request = requestBuilder.build();
+                HttpResponse response = HttpLlm.getHttpClient().send(request, HttpResponse.BodyHandlers.ofInputStream());
+                log.info("response statusCode:{}", response.statusCode());
+            } catch (IOException | InterruptedException e) {
+                log.error("Error sending HTTP request", e);
+            }
+        }).start();
+
         GlobalDefaultOxySpaceMapping.searchCurrentThreadStackAnnotationOxySpaceName(Thread.currentThread().getStackTrace()[1].getClassName());
         ServerApp.main(args);
     }

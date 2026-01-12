@@ -16,6 +16,8 @@
 package com.jd.oxygent.core.oxygent.utils;
 
 
+import lombok.extern.slf4j.Slf4j;
+
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -68,9 +70,8 @@ import java.util.logging.Logger;
  * @version 1.0.0
  * @since 1.0.0
  */
+@Slf4j
 public class FileUtils {
-
-    private static final Logger logger = Logger.getLogger(FileUtils.class.getName());
 
     /**
      * Get index file path
@@ -200,7 +201,7 @@ public class FileUtils {
             var content = new String(bytes, StandardCharsets.UTF_8);
             return JsonUtils.parseJsonString(content);
         } catch (Exception e) {
-            logger.warning("Failed to read JSON file using UTF-8: " + path + ", error: " + e.getMessage());
+            log.warn("Failed to read JSON file using UTF-8: " + path + ", error: " + e.getMessage());
 
             // Fallback to system default encoding
             try {
@@ -211,13 +212,13 @@ public class FileUtils {
                 // Migrate to UTF-8 encoding after successful fallback
                 try {
                     writeJsonAtomic(dataDir, path, data);
-                    logger.info("File migrated to UTF-8 encoding: " + path);
+                    log.info("File migrated to UTF-8 encoding: " + path);
                 } catch (IOException migrationError) {
-                    logger.warning("Unable to rewrite file to UTF-8 encoding " + path + ": " + migrationError.getMessage());
+                    log.warn("Unable to rewrite file to UTF-8 encoding " + path + ": " + migrationError.getMessage());
                 }
                 return data;
             } catch (Exception fallbackError) {
-                logger.severe("JSON file corrupted (fallback encoding also failed) → " + path + ": " + fallbackError.getMessage());
+                log.error("writeJsonAtomic path:{}", path.toString(), fallbackError);
                 return null; // Unrecoverable corruption
             }
         }
@@ -232,7 +233,7 @@ public class FileUtils {
             Files.write(tempFile, jsonString.getBytes(StandardCharsets.UTF_8));
             Files.move(tempFile, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (Exception e) {
-            logger.severe(e.getMessage());
+            log.error("writeJsonAtomic path:{}", path.toString(), e);
         } finally {
             // Clean up temp file if it still exists
             Files.deleteIfExists(tempFile);
@@ -249,7 +250,7 @@ public class FileUtils {
             Files.write(tempFile, jsonString.getBytes(StandardCharsets.UTF_8));
             Files.move(tempFile, path, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
         } catch (Exception e) {
-            logger.severe(e.getMessage());
+            log.error("writeJsonAtomic path:{}", path.toString(), e);
         } finally {
             // Clean up temp file if it still exists
             Files.deleteIfExists(tempFile);

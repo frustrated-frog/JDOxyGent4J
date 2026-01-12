@@ -86,6 +86,10 @@ public class BaseOxy {
     @JsonProperty("input_schema")
     protected Map<String, Object> inputSchema;
 
+    @JsonProperty("system_args")
+    @Builder.Default
+    private List systemArgs = new ArrayList();
+
     @JsonProperty("desc_for_llm")
     @Builder.Default
     private String descForLlm = "";
@@ -177,23 +181,40 @@ public class BaseOxy {
 
     @JsonProperty("semaphore")
     @Builder.Default
-    private int semaphoreCount = 16;
+    private int semaphoreCount = Config.getOxy().getSemaphore();
 
     @Getter
     @JsonIgnore
     private Semaphore semaphore;
 
+    /**
+     * Timeout in seconds
+     */
     @JsonProperty("timeout")
     @Builder.Default
-    private double timeout = 3600.0;
+    private double timeout = Config.getOxy().getTimeout();
 
     @JsonProperty("retries")
     @Builder.Default
-    private int retries = 2;
+    private int retries = Config.getOxy().getRetries();
 
+    /**
+     * delay in seconds
+     */
     @JsonProperty("delay")
     @Builder.Default
-    private double delay = 1.0;
+    private double delay = Config.getOxy().getDelay();
+
+    /**
+     * A list of oxy names that must be called before the current oxy.
+     */
+    @JsonProperty("preceding_oxy")
+    @Builder.Default
+    private List<String> precedingOxy = new ArrayList();
+
+    @JsonProperty("preceding_placeholder")
+    @Builder.Default
+    private String precedingPlaceholder = "preceding_text";
 
     /**
      * Add permitted tool to the tool list
@@ -250,8 +271,8 @@ public class BaseOxy {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> paramInfo = (Map<String, Object>) paramInfoObj;
                     String description = (String) paramInfo.get("description");
-                    if ("SystemArg".equals(description)) {
-                        log.debug("Skipping system parameter: {}", paramName);
+                    if (description != null && description.startsWith("SystemArg")) {
+                        systemArgs.add(description.substring(10));
                         continue;
                     }
 
@@ -302,6 +323,7 @@ public class BaseOxy {
         }
 
         setDescForLlm();
+        permittedOxy.addAll(precedingOxy);
     }
 
     /**
@@ -363,11 +385,12 @@ public class BaseOxy {
         if (oxyRequest == null) {
             throw new IllegalArgumentException("OxyRequest cannot be null");
         }
-        if (oxyRequest.getReferenceTraceId() == null ||
-                !oxyRequest.isLoadDataForRestart() ||
-                mas == null ||
-                mas.getEsClient() == null ||
-                (!"llm".equals(this.getCategory()) && !"tool".equals(this.getCategory()))) {
+        if (oxyRequest.getReferenceTraceId() == null
+                || oxyRequest.getRestartNodeId() == null
+                || !oxyRequest.isLoadDataForRestart()
+                || mas == null
+                || mas.getEsClient() == null
+                || (!"llm".equals(this.getCategory()) && !"tool".equals(this.getCategory()))) {
             return null;
         }
 
@@ -555,6 +578,17 @@ public class BaseOxy {
     }
 
     protected OxyRequest beforeExecute(OxyRequest oxyRequest) {
+        List<String> output = new ArrayList<>();
+        if (precedingOxy != null && !precedingOxy.isEmpty()) {
+            for (String oxyName : precedingOxy) {
+                Map<String, Object> kwargs = new HashMap<>();
+                kwargs.put("callee", oxyName);
+                kwargs.put("arguments", oxyRequest.getArguments());
+                OxyResponse oxyResponse = oxyRequest.call(kwargs);
+                output.add((String) oxyResponse.getOutput());
+            }
+        }
+        oxyRequest.getArguments().put(precedingPlaceholder, String.join("\n", output));
         return oxyRequest;
     }
 
