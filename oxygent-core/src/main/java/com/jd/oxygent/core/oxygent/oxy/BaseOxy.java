@@ -227,7 +227,7 @@ public class BaseOxy {
      * This method generates a formatted description that includes tool name,
      * description, and argument details.
      */
-    protected void setDescForLlm() {
+    public void setDescForLlm() {
         List<String> argsDesc = new ArrayList<>();
 
         if (inputSchema != null && inputSchema.containsKey("properties")) {

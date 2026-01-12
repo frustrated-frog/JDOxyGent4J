@@ -1,5 +1,8 @@
 package com.jd.oxygent.core.oxygent.liveprompt;
 
+import com.jd.oxygent.core.Mas;
+import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
+import com.jd.oxygent.core.oxygent.oxy.agents.LocalAgent;
 import lombok.extern.slf4j.Slf4j;
 
 import java.lang.reflect.Method;
@@ -19,7 +22,7 @@ public class DynamicAgentManager {
     private static DynamicAgentManager instance;
 
     private final Map<String, String> agentPromptMapping = new HashMap<>();
-    private Object masInstance;
+    private Mas mas;
 
     private DynamicAgentManager() {
         // Private constructor for singleton pattern
@@ -34,53 +37,25 @@ public class DynamicAgentManager {
         }
     }
 
-    public boolean registerAgentsFromMas(Object masInstance) {
+    public boolean registerAgentsFromMas(Mas mas) {
         try {
-            this.masInstance = masInstance;
-            Map<?, ?> oxyNameToOxy = null;
-
-            // Get actual agents from masInstance
-            try {
-                Method getOxyNameToOxyMethod = masInstance.getClass().getMethod("getOxyNameToOxy");
-                oxyNameToOxy = (Map<?, ?>) getOxyNameToOxyMethod.invoke(masInstance);
-            } catch (NoSuchMethodException e) {
-                // Fallback: try to access the field directly
-                java.lang.reflect.Field oxyNameToOxyField = masInstance.getClass().getDeclaredField("oxy_name_to_oxy");
-                oxyNameToOxyField.setAccessible(true);
-                oxyNameToOxy = (Map<?, ?>) oxyNameToOxyField.get(masInstance);
-            }
-
+            this.mas = mas;
+            Map<String, BaseOxy> oxyNameToOxy = mas.getOxyNameToOxy();
             int registeredCount = 0;
-
             // Only register agents that use live prompts
             for (Object agentNameObj : oxyNameToOxy.keySet()) {
                 String agentName = agentNameObj.toString();
-                Object agentInstance = oxyNameToOxy.get(agentNameObj);
+                BaseOxy agentInstance = oxyNameToOxy.get(agentNameObj);
 
                 // Check if this agent uses live prompts by examining its prompt
-                if (_agentUsesLivePrompts(agentInstance)) {
+                if (agentUsesLivePrompts(agentInstance)) {
                     // Use agent's custom promptKey if set, otherwise default to {agentName}_prompt
                     String promptKey = null;
-                    try {
-                        // Try to get promptKey field
-                        java.lang.reflect.Field promptKeyField = agentInstance.getClass().getDeclaredField("prompt_key");
-                        promptKeyField.setAccessible(true);
-                        promptKey = (String) promptKeyField.get(agentInstance);
-                    } catch (NoSuchFieldException e) {
-                        // Try getter method
-                        try {
-                            Method getPromptKeyMethod = agentInstance.getClass().getMethod("getPromptKey");
-                            promptKey = (String) getPromptKeyMethod.invoke(agentInstance);
-                        } catch (NoSuchMethodException ex) {
-                            // Use default prompt key
-                            promptKey = agentName + "_prompt";
-                        }
-                    }
-
-                    if (promptKey == null || promptKey.isEmpty()) {
+                    if (agentInstance instanceof LocalAgent agent) {
+                        promptKey = agent.getPromptKey();
+                    } else {
                         promptKey = agentName + "_prompt";
                     }
-
                     agentPromptMapping.put(agentName, promptKey);
                     registeredCount++;
                     log.info("Registered live prompt agent: {} with key: {}", agentName, promptKey);
@@ -99,47 +74,23 @@ public class DynamicAgentManager {
         }
     }
 
-    private boolean _agentUsesLivePrompts(Object agentInstance) {
-        try {
-            // Check if agent has a prompt attribute
-            try {
-                java.lang.reflect.Field promptField = agentInstance.getClass().getDeclaredField("prompt");
-                promptField.setAccessible(true);
-                return true;
-            } catch (NoSuchFieldException e) {
-                // Try getter method
-                try {
-                    Method getPromptMethod = agentInstance.getClass().getMethod("getPrompt");
-                    return true;
-                } catch (NoSuchMethodException ex) {
-                    return false;
-                }
-            }
-        } catch (Exception e) {
-            log.warn("Error checking if agent uses live prompts: {}", e);
+    private boolean agentUsesLivePrompts(BaseOxy agentInstance) {
+        if (agentInstance instanceof LocalAgent agent) {
+            return agent.isUserLivePrompt();
+        } else {
             return false;
         }
     }
 
     public boolean updateAgentPrompt(String agentName) {
-        if (masInstance == null || !agentPromptMapping.containsKey(agentName)) {
+        if (mas == null || !agentPromptMapping.containsKey(agentName)) {
             log.warn("Agent not found: {}", agentName);
             return false;
         }
 
         try {
-            Map<?, ?> oxyNameToOxy = null;
-            try {
-                Method getOxyNameToOxyMethod = masInstance.getClass().getMethod("getOxyNameToOxy");
-                oxyNameToOxy = (Map<?, ?>) getOxyNameToOxyMethod.invoke(masInstance);
-            } catch (NoSuchMethodException e) {
-                // Fallback: try to access the field directly
-                java.lang.reflect.Field oxyNameToOxyField = masInstance.getClass().getDeclaredField("oxy_name_to_oxy");
-                oxyNameToOxyField.setAccessible(true);
-                oxyNameToOxy = (Map<?, ?>) oxyNameToOxyField.get(masInstance);
-            }
-
-            Object agentInstance = oxyNameToOxy.get(agentName);
+            Map<String, BaseOxy> oxyNameToOxy = mas.getOxyNameToOxy();
+            BaseOxy agentInstance = oxyNameToOxy.get(agentName);
             String promptKey = agentPromptMapping.get(agentName);
 
             // Get manager (cache may already have latest data from savePrompt)
@@ -147,14 +98,9 @@ public class DynamicAgentManager {
             log.debug("Hot reload for {} using promptKey: {}", agentName, promptKey);
 
             // Use agent's reloadPrompt method if available
-            try {
-                Method reloadPromptMethod = agentInstance.getClass().getMethod("reloadPrompt");
-                Boolean success = (Boolean) reloadPromptMethod.invoke(agentInstance);
-                if (success) {
-                    log.debug("Hot-reloaded prompt for: {}", agentName);
-                }
-                return success;
-            } catch (NoSuchMethodException e) {
+            if (agentInstance instanceof LocalAgent agent) {
+                return agent.reloadPrompt();
+            } else {
                 // Fallback to old approach for backward compatibility
                 try {
                     // Get original prompt as fallback
@@ -181,13 +127,8 @@ public class DynamicAgentManager {
                         setPromptMethod.invoke(agentInstance, newPrompt);
                     }
 
-                    // Re-set description for LLM if method exists
-                    try {
-                        Method setDescForLlmMethod = agentInstance.getClass().getMethod("_set_desc_for_llm");
-                        setDescForLlmMethod.invoke(agentInstance);
-                    } catch (NoSuchMethodException ex) {
-                        // Ignore if method doesn't exist
-                    }
+                    // Re-set description for LLM
+                    agentInstance.setDescForLlm();
 
                     log.info("Updated prompt for: {}", agentName);
                     return true;
@@ -269,11 +210,11 @@ public class DynamicAgentManager {
     }
 
     // MAS setup functions
-    public static void setupDynamicAgents(Object masInstance) {
+    public static void setupDynamicAgents(Mas mas) {
         log.debug("Setting up dynamic agents...");
 
         DynamicAgentManager manager = getInstance();
-        boolean success = manager.registerAgentsFromMas(masInstance);
+        boolean success = manager.registerAgentsFromMas(mas);
 
         if (success) {
             int registeredCount = manager.getAgentPromptMapping().size();
@@ -288,13 +229,13 @@ public class DynamicAgentManager {
             }
 
             // Auto-save existing agent prompts to database
-            autoSaveAgentPromptsToDatabase(masInstance);
+            autoSaveAgentPromptsToDatabase(mas);
         } else {
             log.info("Dynamic agent manager setup failed");
         }
     }
 
-    private static void autoSaveAgentPromptsToDatabase(Object masInstance) {
+    private static void autoSaveAgentPromptsToDatabase(Mas mas) {
         try {
             // Use global singleton prompt manager (CRITICAL: ensures cache consistency)
             PromptManager manager = PromptManager.getInstance();
@@ -312,21 +253,10 @@ public class DynamicAgentManager {
 
             DynamicAgentManager dynamicAgentManager = getInstance();
             Map<String, String> agentPromptMapping = dynamicAgentManager.getAgentPromptMapping();
-
-            // Get oxy_name_to_oxy map from masInstance
-            Map<?, ?> oxyNameToOxy = null;
-            try {
-                Method getOxyNameToOxyMethod = masInstance.getClass().getMethod("getOxyNameToOxy");
-                oxyNameToOxy = (Map<?, ?>) getOxyNameToOxyMethod.invoke(masInstance);
-            } catch (NoSuchMethodException e) {
-                java.lang.reflect.Field oxyNameToOxyField = masInstance.getClass().getDeclaredField("oxy_name_to_oxy");
-                oxyNameToOxyField.setAccessible(true);
-                oxyNameToOxy = (Map<?, ?>) oxyNameToOxyField.get(masInstance);
-            }
-
+            Map<String, BaseOxy> oxyNameToOxy = mas.getOxyNameToOxy();
             // Save prompts for registered live prompt agents only
             for (String agentName : agentPromptMapping.keySet()) {
-                Object agentInstance = oxyNameToOxy.get(agentName);
+                BaseOxy agentInstance = oxyNameToOxy.get(agentName);
                 // Use the promptKey that was registered (may be custom or default)
                 String promptKey = agentPromptMapping.get(agentName);
 

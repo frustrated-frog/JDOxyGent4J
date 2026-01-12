@@ -6,8 +6,6 @@ import com.jd.oxygent.core.oxygent.infra.impl.databases.es.LocalEs;
 import com.jd.oxygent.core.oxygent.samples.server.masprovider.factory.impl.platform.spring.ApplicationContextHolder;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -15,7 +13,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -672,13 +669,9 @@ public class PromptManager {
 
     public void startVersionSync() {
         try {
-            // Lazy import to avoid circular dependency
-            if (versionSyncCoordinator == null) {
-                VersionSyncCoordinator coordinator = VersionSyncCoordinator.getInstance(this);
-                versionSyncCoordinator = coordinator;
-                coordinator.start();
-                log.info("Version synchronization started");
-            }
+            VersionSyncCoordinator coordinator = VersionSyncCoordinator.getInstance(this);
+            coordinator.start();
+            log.info("Version synchronization started");
         } catch (Exception e) {
             log.error("Failed to start version synchronization: {}", e);
         }

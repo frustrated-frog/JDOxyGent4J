@@ -269,13 +269,11 @@ public class Config {
      */
     @Data
     public static class LlmConfig {
-        private String cls = "com.jd.oxygent.core.oxygent.oxy.llms.HttpLLm";
-        private String baseUrl = "http://localhost:11434";
-        private String apiKey = "YOUR-API-KEY";
-        private String modelName = "gpt-4.1";
         private double temperature = 0.1;
         private int maxTokens = 4096;
         private double topP = 1.0;
+        private int semaphore = 16;
+        private int timeout = 300;
     }
 
     @Data
@@ -309,6 +307,7 @@ public class Config {
         private String logLevel = "INFO";
         private String firstQuery = "What time is it now?";
         private String welcomeMessage = "Hi, I’m OxyGent. How can I assist you?";
+        private int workers = 1;
     }
 
     @Data
@@ -321,7 +320,7 @@ public class Config {
         private int semaphore = 1024;
         private int timeout = 3600; // ms
         private int retries = 2;
-        private double delay = 2.0;
+        private double delay = 1.0;
     }
 
     @Data
@@ -342,7 +341,6 @@ public class Config {
 
     public static Map getLlmConfigMap() {
         Map llmConfig = new HashMap<>();
-        llmConfig.put("model", llm.getModelName());
         llmConfig.put("temperature", llm.getTemperature());
         llmConfig.put("max_tokens", llm.getMaxTokens());
         llmConfig.put("top_p", llm.getTopP());

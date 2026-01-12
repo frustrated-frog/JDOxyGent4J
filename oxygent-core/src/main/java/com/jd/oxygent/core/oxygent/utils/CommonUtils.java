@@ -17,6 +17,7 @@ package com.jd.oxygent.core.oxygent.utils;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import com.github.f4b6a3.uuid.codec.base.Base64UrlCodec;
+import jakarta.servlet.http.HttpServletRequest;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import org.slf4j.Logger;
@@ -1121,4 +1122,37 @@ public class CommonUtils {
         }
         return data;
     }
+
+    /**
+     * Get client IP
+     * @param request
+     * @return
+     */
+    public static String getClientIp(HttpServletRequest request) {
+        String[] headers = {
+                "X-Forwarded-For",
+                "X-Real-IP",
+                "Proxy-Client-IP",
+                "WL-Proxy-Client-IP",
+                "HTTP_X_FORWARDED_FOR",
+                "HTTP_X_REAL_IP",
+                "HTTP_PROXY_CLIENT_IP",
+                "HTTP_WL_PROXY_CLIENT_IP"
+        };
+        for (String header : headers) {
+            String ip = request.getHeader(header);
+            if (ip != null && ip.length() != 0 && !"unknown".equalsIgnoreCase(ip)) {
+                // X-Forwarded-For 可能包含多个 IP，取第一个非 unknown 的
+                if (header.equalsIgnoreCase("X-Forwarded-For")) {
+                    int commaIndex = ip.indexOf(',');
+                    if (commaIndex != -1) {
+                        ip = ip.substring(0, commaIndex).trim();
+                    }
+                }
+                return ip;
+            }
+        }
+        return request.getRemoteAddr();
+    }
+
 }

@@ -256,4 +256,7 @@ public class FileUtils {
         }
     }
 
+    public static void delete(Path indexPath) throws IOException {
+        Files.delete(indexPath);
+    }
 }

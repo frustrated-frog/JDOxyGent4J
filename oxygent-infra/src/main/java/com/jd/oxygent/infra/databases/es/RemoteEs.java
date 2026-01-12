@@ -6,7 +6,9 @@ import com.jd.oxygent.core.oxygent.utils.JsonUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
 import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
+import org.elasticsearch.action.admin.indices.delete.DeleteIndexRequest;
 import org.elasticsearch.action.admin.indices.get.GetIndexRequest;
+import org.elasticsearch.action.admin.indices.refresh.RefreshRequest;
 import org.elasticsearch.action.bulk.BulkItemResponse;
 import org.elasticsearch.action.bulk.BulkRequest;
 import org.elasticsearch.action.bulk.BulkResponse;
@@ -16,6 +18,7 @@ import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequest;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.support.master.AcknowledgedResponse;
 import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.common.settings.Settings;
@@ -229,6 +232,26 @@ public class RemoteEs extends BaseDB implements BaseEs {
             esConfiguration.getClient().close();
         } catch (Exception e) {
             throw new RuntimeException("Failed to close ES client", e);
+        }
+    }
+
+    @Override
+    public Map<String, Object> deleteIndex(String indexName) {
+        try {
+            // Parameter validation
+            validateIndexName(indexName, "delete");
+            // Execute bulk operation
+            AcknowledgedResponse acknowledgedResponse = esConfiguration.getClient().indices().delete(new DeleteIndexRequest(indexName), RequestOptions.DEFAULT);
+            if (acknowledgedResponse.isAcknowledged()) {
+                log.info("Index created successfully: {}", indexName);
+                return Map.of("acknowledged", true);
+            } else {
+                log.warn("Index creation not acknowledged: {}", indexName);
+                return Map.of("acknowledged", false);
+            }
+        } catch (Exception e) {
+            log.error("Unknown exception occurred during bulk delete operation: {}", e.getMessage(), e);
+            return handleException(e, "delete");
         }
     }
 
@@ -572,4 +595,16 @@ public class RemoteEs extends BaseDB implements BaseEs {
         int size;
     }
 
+    @Override
+    public Map<String, Object> refreshIndex(String indexName) {
+        try {
+            if (org.apache.commons.lang3.StringUtils.isEmpty(indexName)) {
+                log.warn("Invalid parameters for createIndex, indexName={}", indexName);
+                return Map.of("error", "Invalid parameters");
+            }
+            return Map.of("acknowledged", esConfiguration.getClient().indices().refresh(new RefreshRequest(indexName), RequestOptions.DEFAULT));
+        } catch (Exception e) {
+            return handleException(e, "createIndex");
+        }
+    }
 }

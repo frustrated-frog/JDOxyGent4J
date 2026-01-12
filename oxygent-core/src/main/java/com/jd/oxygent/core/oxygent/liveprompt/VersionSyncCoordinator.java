@@ -1,6 +1,9 @@
 package com.jd.oxygent.core.oxygent.liveprompt;
 
 import com.jd.oxygent.core.Config;
+import com.jd.oxygent.core.oxygent.infra.databases.BaseEs;
+import com.jd.oxygent.core.oxygent.infra.impl.databases.es.LocalEs;
+import com.jd.oxygent.core.oxygent.samples.server.masprovider.factory.impl.platform.spring.ApplicationContextHolder;
 import lombok.extern.slf4j.Slf4j;
 
 import java.util.HashMap;
@@ -9,8 +12,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -24,16 +31,22 @@ public class VersionSyncCoordinator {
     private static VersionSyncCoordinator instance;
 
     private PromptManager promptManager;
+    private BaseEs esClient;
+
     private int pollingInterval;
     private boolean useEsPolling;
-    private ScheduledExecutorService pollingExecutor = Executors.newSingleThreadScheduledExecutor();
+    private ScheduledExecutorService pollingExecutor;
+
     private boolean isRunning;
     private Map<String, Integer> localVersions = new ConcurrentHashMap<>();  // Track local versions
     private Map<String, Set<Integer>> pendingUpdates = new ConcurrentHashMap<>();  // Track pending updates: {promptKey: {version, ...}}
 
     public VersionSyncCoordinator(PromptManager promptManager, Integer pollingInterval) {
         this.promptManager = promptManager;
-
+        esClient = ApplicationContextHolder.getBean(BaseEs.class);
+        if (esClient == null) {
+            esClient = new LocalEs();
+        }
         // Read polling interval from config, or use default value
         if (pollingInterval == null) {
             this.pollingInterval = Config.getLivePrompt().getEsPollingInterval();
@@ -47,37 +60,11 @@ public class VersionSyncCoordinator {
     }
 
     private void detectSyncMechanisms() {
-        // Detect ES polling availability based on configuration
-        if (Config.getEs().getHosts() != null && Config.getEs().getHosts().size() > 0) {
-            String hosts = Config.getEs().getHosts().get(0);
-            String[] hostList = hosts.split(",");
-
-            // Check if any host is not local
-            boolean hasRemoteEs = false;
-            for (String host : hostList) {
-                String hostName = host.split(":")[0].trim();
-                if (!hostName.equals("localhost") && !hostName.equals("127.0.0.1") && !hostName.equals("0.0.0.0")) {
-                    hasRemoteEs = true;
-                    break;
-                }
-            }
-
-            if (hasRemoteEs) {
-                this.useEsPolling = true;
-                log.info("ES polling enabled for remote hosts: {}", hosts);
-            } else {
-                log.info("Local ES detected, polling disabled for multi-instance sync");
-            }
+        if (esClient instanceof LocalEs) {
+            log.info("Local ES detected, polling disabled for multi-instance sync");
         } else {
-            log.info("ES not configured, polling disabled");
-        }
-
-        // If ES polling is not available, log a warning
-        if (!this.useEsPolling) {
-            log.warn(
-                    "ES polling not available. "
-                            + "Cache consistency across instances is not guaranteed."
-            );
+            this.useEsPolling = true;
+            log.info("ES polling enabled for remote hosts");
         }
     }
 
@@ -133,7 +120,7 @@ public class VersionSyncCoordinator {
                 pollingInterval
         );
 
-        pollingExecutor = Executors.newSingleThreadScheduledExecutor();
+        pollingExecutor = new ScheduledThreadPoolExecutor(1);
         pollingExecutor.scheduleAtFixedRate(
                 this::esPoller,
                 0,
@@ -205,7 +192,7 @@ public class VersionSyncCoordinator {
     }
 
     private void handleVersionUpdate(String promptKey, int newVersion) {
-            try {
+        try {
             // Prevent duplicate updates for the same version
             synchronized (pendingUpdates) {
                 Set<Integer> versions = pendingUpdates.getOrDefault(promptKey, new HashSet<>());

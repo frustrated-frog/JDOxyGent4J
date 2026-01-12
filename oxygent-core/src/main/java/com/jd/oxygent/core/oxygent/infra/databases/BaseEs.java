@@ -189,4 +189,7 @@ public interface BaseEs {
      */
     void close();
 
+    Map<String, Object> deleteIndex(String indexName);
+
+    Map<String, Object> refreshIndex(String indexName);
 }
