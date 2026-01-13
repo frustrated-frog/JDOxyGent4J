@@ -144,6 +144,14 @@ public class Config {
                             config -> xfile = config);
                     loadConfigSafely(defaultConf, "vearch", VearchConfig.class, () -> vearch = new VearchConfig(),
                             config -> vearch = config);
+                    loadConfigSafely(defaultConf, "oxy", OxyConfig.class, () -> oxy = new OxyConfig(),
+                            config -> oxy = config);
+                    loadConfigSafely(defaultConf, "tool", ToolConfig.class, () -> tool = new ToolConfig(),
+                            config -> tool = config);
+                    loadConfigSafely(defaultConf, "livePrompt", LivePromptConfig.class, () -> livePrompt = new LivePromptConfig(),
+                            config -> livePrompt = config);
+
+                    setServerWorker();
                     log.info("Finished reading config.json, path:{} env:{}", configFilePath, configFileEnv);
                 }
             }
@@ -211,6 +219,14 @@ public class Config {
         }
     }
 
+    private static void setServerWorker() {
+        try {
+            Config.getServer().setWorkers(Runtime.getRuntime().availableProcessors() * 2 + 1);
+        } catch (Exception e) {
+            // ignore
+        }
+    }
+
     /**
      * Agent Configuration Class
      * <p>
@@ -273,7 +289,7 @@ public class Config {
         private int maxTokens = 4096;
         private double topP = 1.0;
         private int semaphore = 16;
-        private int timeout = 300;
+        private double timeout = 300.0; // seconds
     }
 
     @Data
@@ -306,7 +322,6 @@ public class Config {
         private boolean autoOpenWebpage = true;
         private String logLevel = "INFO";
         private String firstQuery = "What time is it now?";
-        private String welcomeMessage = "Hi, I’m OxyGent. How can I assist you?";
         private int workers = 1;
     }
 
@@ -328,7 +343,7 @@ public class Config {
         private boolean mcpIsKeepAlive = true;
         private boolean isConcurrentInit = true;
         private int semaphore = 1024;
-        private int timeout = 60; // second
+        private double timeout = 60.0; // seconds
     }
 
     @Data

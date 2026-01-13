@@ -15,6 +15,8 @@
  */
 package com.jd.oxygent.core.oxygent.oxy.llms;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.jd.oxygent.core.Config;
 import com.jd.oxygent.core.oxygent.infra.multimodal.MultimodalResourceType;
 import com.jd.oxygent.core.oxygent.utils.*;
@@ -28,6 +30,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
@@ -37,6 +40,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Semaphore;
 import java.util.logging.Logger;
 
 import static com.jd.oxygent.core.oxygent.utils.CommonUtils.getFormatTime;
@@ -125,7 +129,15 @@ public abstract class BaseLlM extends BaseOxy {
      * @since 1.0.0
      */
     @Builder.Default
-    protected double timeout = 300.0;
+    protected double timeout = Config.getLlm().getTimeout();
+
+    @JsonProperty("semaphore")
+    @Builder.Default
+    private int semaphoreCount = Config.getLlm().getSemaphore();
+
+    @Getter
+    @JsonIgnore
+    private Semaphore semaphore = new Semaphore(Config.getLlm().getSemaphore(), true);
 
     /**
      * LLM parameter configuration

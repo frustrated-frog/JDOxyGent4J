@@ -27,10 +27,13 @@ import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
 import com.jd.oxygent.core.oxygent.samples.server.masprovider.MasFactoryRegistry;
 import com.jd.oxygent.core.oxygent.samples.server.utils.FileValidationUtil;
 import com.jd.oxygent.core.oxygent.samples.server.utils.RecursivePackageInstantiator;
-import com.jd.oxygent.core.oxygent.samples.server.vo.*;
+import com.jd.oxygent.core.oxygent.samples.server.vo.AgentNodeConverter;
+import com.jd.oxygent.core.oxygent.samples.server.vo.ItemRequest;
+import com.jd.oxygent.core.oxygent.samples.server.vo.OrganizationWrapper;
+import com.jd.oxygent.core.oxygent.samples.server.vo.ScriptRequest;
+import com.jd.oxygent.core.oxygent.samples.server.vo.WebResponse;
 import com.jd.oxygent.core.oxygent.schemas.SSEMessage;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.ConversationRating;
-import com.jd.oxygent.core.oxygent.schemas.evaluation.ConversationWithRating;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingRequest;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingResponse;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingStats;
@@ -64,7 +67,16 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Function;
@@ -72,7 +84,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.*;
+import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.DEFAULT_FILE_STORE_TEMP_DIR;
+import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.DEFAULT_MEMORY_SIZE_THRESHOLD;
+import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.DEFAULT_UPLOAD_ALL_FILE_MAX_SIZE_THRESHOLD;
+import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.DEFAULT_UPLOAD_FILE_MAX_SIZE_THRESHOLD;
+import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.RESTRICTED_HEADERS;
 
 /**
  * Main routing servlet for OxyGent server that handles various HTTP endpoints
@@ -87,8 +103,9 @@ import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.*;
 public class RouteServlet extends HttpServlet {
 
     private final Mas mas = MasFactoryRegistry.getFactory().createMas();
+    private final EvaluationManager evaluationManager = EvaluationManager.getInstance();
+    private final PromptManager promptManager = PromptManager.getInstance();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private PromptManager promptManager = PromptManager.getInstance();
 
     private Function<Map<String, Object>, Map<String, Object>> funcInterceptor = x -> null;
     private Function<Map<String, Object>, Map<String, Object>> funcFilter = x -> x;
@@ -240,8 +257,7 @@ public class RouteServlet extends HttpServlet {
      */
     private void getWelcomeMessage(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
-            String welcomeMessage = Config.getServer().getWelcomeMessage() != null
-                    ? Config.getServer().getWelcomeMessage() : "";
+            String welcomeMessage = Config.getAgent().getWelcomeMessage();
             Map<String, Object> data = Map.of("welcome_message", welcomeMessage);
             sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(data).toMap());
         } catch (Exception e) {
@@ -1117,11 +1133,6 @@ public class RouteServlet extends HttpServlet {
         String method = request.getMethod();
 
         try {
-            // Ensure prompt manager is initialized
-            if (promptManager == null) {
-                promptManager = PromptManager.getInstance();
-            }
-
             // Handle different prompt API endpoints
             if (path.equals("/api/prompts/")) {
                 if (method.equals("GET")) {
@@ -1643,7 +1654,7 @@ public class RouteServlet extends HttpServlet {
             // Find the specific version
             Map<String, Object> targetVersion = null;
             for (Map<String, Object> hist : history) {
-                if (hist.get("version") instanceof Long && ((Long) hist.get("version")).intValue() == version) {
+                if (Integer.parseInt(hist.get("version").toString()) == version) {
                     targetVersion = hist;
                     break;
                 }
@@ -1714,7 +1725,7 @@ public class RouteServlet extends HttpServlet {
         try {
             Map<String, Object> payload = readRequestBody(request);
             RatingRequest ratingRequest = new RatingRequest((String) payload.get("trace_id"), RatingType.valueOf(((String) payload.get("rating_type")).toUpperCase()), (String) payload.get("comment"), (String) payload.get("erp"));
-            RatingResponse result = EvaluationManager.getInstance().createRating(ratingRequest, request, null);
+            RatingResponse result = evaluationManager.createRating(ratingRequest, request, null);
 
             Map<String, Object> data = new HashMap<>();
             data.put("rating_id", result.getRatingId());
@@ -1741,7 +1752,7 @@ public class RouteServlet extends HttpServlet {
      */
     private void getRatingStats(String traceId, HttpServletResponse response) throws IOException {
         try {
-            Optional<RatingStats> stats = EvaluationManager.getInstance().getRatingStats(traceId);
+            Optional<RatingStats> stats = evaluationManager.getRatingStats(traceId);
             if (stats.isPresent()) {
                 sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(stats.get()).toMap());
             } else {
@@ -1765,7 +1776,7 @@ public class RouteServlet extends HttpServlet {
      */
     private void getCurrentRating(String traceId, String erp, HttpServletResponse response) throws IOException {
         try {
-            List<ConversationRating> ratings = EvaluationManager.getInstance().getRatingHistory(traceId, Optional.of(erp));
+            List<ConversationRating> ratings = evaluationManager.getRatingHistory(traceId, Optional.of(erp));
             ConversationRating currentRating = ratings.isEmpty() ? null : ratings.get(0);
             Map<String, Object> data = new HashMap<>();
             data.put("trace_id", traceId);
@@ -1788,7 +1799,7 @@ public class RouteServlet extends HttpServlet {
      */
     private void getRatingHistory(String traceId, String erp, HttpServletResponse response) throws IOException {
         try {
-            List<ConversationRating> history = EvaluationManager.getInstance().getRatingHistory(traceId, Optional.of(erp));
+            List<ConversationRating> history = evaluationManager.getRatingHistory(traceId, Optional.of(erp));
             List<Map<String, Object>> ratingsData = history.stream()
                     .map(ConversationRating::toMap)
                     .collect(Collectors.toList());
@@ -1811,7 +1822,7 @@ public class RouteServlet extends HttpServlet {
      */
     private void clearAllRatingData(HttpServletResponse response) throws IOException {
         try {
-            Map<String, Object> result = EvaluationManager.getInstance().clearAllRatingData();
+            Map<String, Object> result = evaluationManager.clearAllRatingData();
             sendJsonResponse(response, HttpServletResponse.SC_OK,
                     WebResponse.success(result).toMap());
         } catch (Exception e) {
@@ -1826,7 +1837,7 @@ public class RouteServlet extends HttpServlet {
      */
     private void setupRatingIndices(HttpServletResponse response) throws IOException {
         try {
-            Map<String, Object> result = EvaluationManager.getInstance().ensureRatingIndicesWithCorrectMapping();
+            Map<String, Object> result = evaluationManager.ensureRatingIndicesWithCorrectMapping();
             if ((Boolean) result.get("success")) {
                 List<String> createdIndices = new ArrayList<>();
                 if ((Boolean) result.get("rating_index_created")) {
@@ -1859,7 +1870,7 @@ public class RouteServlet extends HttpServlet {
      */
     private void rebuildRatingStats(String traceId, HttpServletResponse response) throws IOException {
         try {
-            RatingStats stats = EvaluationManager.getInstance().updateRatingStats(traceId, null);
+            RatingStats stats = evaluationManager.updateRatingStats(traceId, null);
 
             Map<String, Object> responseData = new HashMap<>();
             responseData.put("trace_id", traceId);
@@ -1880,7 +1891,7 @@ public class RouteServlet extends HttpServlet {
      */
     private void deleteRating(String ratingId, HttpServletResponse response) throws IOException {
         try {
-            boolean success = EvaluationManager.getInstance().deleteRating(ratingId);
+            boolean success = evaluationManager.deleteRating(ratingId);
             Map<String, Object> responseData = new HashMap<>();
             responseData.put("deleted", success);
             responseData.put("rating_id", ratingId);
@@ -1906,7 +1917,7 @@ public class RouteServlet extends HttpServlet {
             String ratingFilter = CommonUtils.getOrDefault(request.getParameter("rating_filter"), "all");
             String searchTerm = CommonUtils.getOrDefault(request.getParameter("search_term"), "");
 
-            Map<String, Object> responseData = EvaluationManager.getInstance().historyWithRatings(ratingFilter, searchTerm, page, pageSize);
+            Map<String, Object> responseData = evaluationManager.historyWithRatings(ratingFilter, searchTerm, page, pageSize);
             sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(responseData).toMap());
         } catch (Exception e) {
             log.error("Get history with ratings failed", e);
@@ -1921,7 +1932,7 @@ public class RouteServlet extends HttpServlet {
     private void analyticsRatings(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             int days = Integer.parseInt(CommonUtils.getOrDefault(request.getParameter("days"), "7"));
-            Map<String, Object> stats = EvaluationManager.getInstance().getOverallRatingStats(days);
+            Map<String, Object> stats = evaluationManager.getOverallRatingStats(days);
             sendJsonResponse(response, HttpServletResponse.SC_OK,
                     WebResponse.success(stats).toMap());
         } catch (Exception e) {

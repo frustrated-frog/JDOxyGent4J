@@ -15,6 +15,7 @@
  */
 package com.jd.oxygent.core.oxygent.oxy.mcp;
 
+import com.jd.oxygent.core.Config;
 import com.jd.oxygent.core.oxygent.oxy.BaseTool;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyResponse;
@@ -86,7 +87,7 @@ public abstract class BaseMCPClient extends BaseTool {
     protected Map<String, String> headers = new HashMap<>();
     protected boolean isDynamicHeaders = false;
     protected boolean isInheritHeaders = false;
-    protected boolean isKeepAlive = false;
+    protected boolean isKeepAlive = Config.getTool().isMcpIsKeepAlive();
 
     private static final Pattern DIGIT_PATTERN = Pattern.compile("text=\\{(.*?)}]", Pattern.DOTALL);
 

@@ -1,9 +1,11 @@
 package com.jd.oxygent.infra.databases.es;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.jd.oxygent.core.oxygent.infra.databases.BaseDB;
 import com.jd.oxygent.core.oxygent.infra.databases.BaseEs;
 import com.jd.oxygent.core.oxygent.utils.JsonUtils;
+import com.jd.oxygent.core.oxygent.utils.StringUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.elasticsearch.action.admin.indices.create.CreateIndexRequest;
 import org.elasticsearch.action.admin.indices.create.CreateIndexResponse;
@@ -245,6 +247,17 @@ public class RemoteEs extends BaseDB implements BaseEs {
             sourceBuilder.query(queryBuilder);
             for (SortBuilder<?> sortBuilder : sortBuilders) {
                 sourceBuilder.sort(sortBuilder);
+            }
+            JsonNode sourceNode = rootNode.get("_source");
+            if (sourceNode instanceof ArrayNode arrayNode) {
+                List<String> result = new ArrayList<>();
+                for (int i = 0; i < arrayNode.size(); i++) {
+                    JsonNode element = arrayNode.get(i);
+                    if (StringUtils.isNotBlank(element.asText())) {
+                        result.add(element.asText());
+                    }
+                }
+                sourceBuilder.fetchSource(result.toArray(new String[0]), null);
             }
             SearchRequest searchRequest = new SearchRequest(indexName);
             searchRequest.source(sourceBuilder);

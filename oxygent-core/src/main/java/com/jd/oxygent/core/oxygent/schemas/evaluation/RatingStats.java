@@ -86,9 +86,9 @@ public class RatingStats {
     public static RatingStats fromMap(Map<String, Object> map) {
         RatingStats stats = new RatingStats();
         stats.setTraceId((String) map.getOrDefault("trace_id", null));
-        stats.setLikeCount((Integer) map.getOrDefault("like_count", 0));
-        stats.setDislikeCount((Integer) map.getOrDefault("dislike_count", 0));
-        stats.setTotalRatings((Integer) map.getOrDefault("total_ratings", 0));
+        stats.setLikeCount(Integer.parseInt(map.getOrDefault("like_count", "0").toString()));
+        stats.setDislikeCount(Integer.parseInt(map.getOrDefault("dislike_count", "0").toString()));
+        stats.setTotalRatings(Integer.parseInt(map.getOrDefault("total_ratings", "0").toString()));
         stats.setSatisfactionRate((Double) map.getOrDefault("satisfaction_rate", 0.0));
         stats.setLastUpdated((String) map.getOrDefault("last_updated", null));
         return stats;

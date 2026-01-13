@@ -185,7 +185,7 @@ public class BaseOxy {
 
     @Getter
     @JsonIgnore
-    private Semaphore semaphore;
+    private Semaphore semaphore = new Semaphore(Config.getOxy().getSemaphore(), true);
 
     /**
      * Timeout in seconds
@@ -318,10 +318,6 @@ public class BaseOxy {
         } else {
             this.inputSchema = this.getInputSchema();
         }
-        if (this.semaphore == null) {
-            this.semaphore = new Semaphore(this.semaphoreCount, true);
-        }
-
         setDescForLlm();
         permittedOxy.addAll(precedingOxy);
     }

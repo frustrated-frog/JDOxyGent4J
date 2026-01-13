@@ -78,7 +78,7 @@ public class PromptManager {
 
             if (existing != null) {
                 // For updates, always increment based on current version in ES
-                int currentVersion = existing.getOrDefault("version", 1) instanceof Long ? ((Long) existing.getOrDefault("version", 1)).intValue() : (Integer) existing.getOrDefault("version", 1);
+                int currentVersion = Integer.parseInt(existing.getOrDefault("version", "1").toString());
                 doc.put("version", currentVersion + 1);
 
                 // Verify cache hasn't drifted from ES
@@ -86,7 +86,7 @@ public class PromptManager {
                 try {
                     Map<String, Object> cachedPrompt = promptCache.get(promptKey);
                     if (cachedPrompt != null) {
-                        int cachedVersion = cachedPrompt.getOrDefault("version", 0) instanceof Long ? ((Long) cachedPrompt.getOrDefault("version", 0)).intValue() : (Integer) cachedPrompt.getOrDefault("version", 0);
+                        int cachedVersion = Integer.parseInt(cachedPrompt.getOrDefault("version", "0").toString());
                         if (cachedVersion != currentVersion) {
                             log.warn("Cache version mismatch for {}: cache={}, ES={}. Syncing cache...",
                                     promptKey, cachedVersion, currentVersion);

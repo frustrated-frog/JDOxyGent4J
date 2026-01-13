@@ -6,18 +6,13 @@ import com.jd.oxygent.core.oxygent.infra.impl.databases.es.LocalEs;
 import com.jd.oxygent.core.oxygent.samples.server.masprovider.factory.impl.platform.spring.ApplicationContextHolder;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -33,7 +28,7 @@ public class VersionSyncCoordinator {
     private PromptManager promptManager;
     private BaseEs esClient;
 
-    private int pollingInterval;
+    private int pollingInterval = Config.getLivePrompt().getEsPollingInterval();
     private boolean useEsPolling;
     private ScheduledExecutorService pollingExecutor;
 
@@ -48,9 +43,7 @@ public class VersionSyncCoordinator {
             esClient = new LocalEs();
         }
         // Read polling interval from config, or use default value
-        if (pollingInterval == null) {
-            this.pollingInterval = Config.getLivePrompt().getEsPollingInterval();
-        } else {
+        if (pollingInterval != null) {
             this.pollingInterval = pollingInterval;
         }
 
@@ -81,7 +74,7 @@ public class VersionSyncCoordinator {
 
         // Start ES polling if enabled
         if (useEsPolling) {
-//            startEsPolling(); FIXME
+            startEsPolling();
         }
 
         log.info("Version sync coordinator started");
@@ -108,7 +101,7 @@ public class VersionSyncCoordinator {
         for (Map.Entry<String, Map<String, Object>> entry : cacheSnapshot.entrySet()) {
             String promptKey = entry.getKey();
             Map<String, Object> promptData = entry.getValue();
-            int version = promptData.getOrDefault("version", 1) instanceof Long ? ((Long) promptData.getOrDefault("version", 1)).intValue() : (Integer) promptData.getOrDefault("version", 1);
+            int version = Integer.parseInt(promptData.getOrDefault("version", "1").toString());
             localVersions.put(promptKey, version);
         }
     }
@@ -159,7 +152,7 @@ public class VersionSyncCoordinator {
             Map<String, Object> searchBody = Map.of(
                     "query", Map.of("match_all", Map.of()),
                     "size", 1000,
-                    "_source", List.of("version", "updated_at")
+                    "_source", List.of("prompt_key", "version", "updated_at")
             );
 
             Map<String, Object> response = promptManager.getEsClient().search(promptManager.getIndexName(), searchBody);
@@ -172,10 +165,10 @@ public class VersionSyncCoordinator {
             if (hits != null) {
                 List<Map<String, Object>> hitList = (List<Map<String, Object>>) hits.get("hits");
                 for (Map<String, Object> hit : hitList) {
-                    String promptKey = (String) hit.get("_id");
                     Map<String, Object> source = (Map<String, Object>) hit.get("_source");
                     if (source != null) {
-                        int remoteVersion = source.getOrDefault("version", 1) instanceof Long ? ((Long) source.getOrDefault("version", 1)).intValue() : (Integer) source.getOrDefault("version", 1);
+                        String promptKey = (String) source.get("prompt_key");
+                        int remoteVersion = Integer.parseInt(source.getOrDefault("version", "1").toString());
 
                         // Check if local version is behind
                         int localVersion = localVersions.getOrDefault(promptKey, 0);
@@ -190,6 +183,14 @@ public class VersionSyncCoordinator {
         }
     }
 
+    /**
+     * Handle a version update for a prompt with concurrency control.
+     *
+     *         Prevents duplicate updates, version rollback, and out-of-order updates.
+     *
+     * @param promptKey The prompt key to update
+     * @param newVersion The new version number
+     */
     private void handleVersionUpdate(String promptKey, int newVersion) {
         try {
             // Prevent duplicate updates for the same version
@@ -248,7 +249,7 @@ public class VersionSyncCoordinator {
                 Map<String, Object> promptData = promptManager.getPrompt(promptKey, false);
 
                 if (promptData != null) {
-                    int actualVersion = promptData.getOrDefault("version", 1) instanceof Long ? ((Long) promptData.getOrDefault("version", 1)).intValue() : (Integer) promptData.getOrDefault("version", 1);
+                    int actualVersion = Integer.parseInt(promptData.getOrDefault("version", "1").toString());
                     if (actualVersion == newVersion) {
                         // Update local version tracker
                         localVersions.put(promptKey, newVersion);

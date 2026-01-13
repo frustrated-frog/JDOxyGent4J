@@ -184,7 +184,7 @@ public class RouteController {
     @GetMapping("/get_welcome_message")
     public ResponseEntity<Map<String, Object>> getWelcomeMessage() {
         try {
-            String welcomeMessage = Config.getServer().getWelcomeMessage() != null ? Config.getServer().getWelcomeMessage() : "";
+            String welcomeMessage = Config.getAgent().getWelcomeMessage();
             Map<String, Object> data = Map.of("welcome_message", welcomeMessage);
             return ResponseEntity.ok(WebResponse.success(data).toMap());
         } catch (Exception e) {
