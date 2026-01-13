@@ -3,7 +3,6 @@ package com.jd.oxygent.core;
 import com.jd.oxygent.core.oxygent.infra.databases.BaseEs;
 import com.jd.oxygent.core.oxygent.infra.impl.databases.es.LocalEs;
 import com.jd.oxygent.core.oxygent.samples.server.masprovider.factory.impl.platform.spring.ApplicationContextHolder;
-import com.jd.oxygent.core.oxygent.samples.server.vo.WebResponse;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.ConversationRating;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.ConversationWithRating;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingRequest;
@@ -12,7 +11,6 @@ import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingStats;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingType;
 import com.jd.oxygent.core.oxygent.utils.CommonUtils;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
@@ -25,6 +23,18 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Conversation evaluation manager.
+ *
+ *     Handles evaluation-related data operations including:
+ *     - Storage and retrieval of rating data
+ *     - Calculation and update of rating statistics
+ *     - Aggregated analysis of rating data
+ *
+ * @author OxyGent Team
+ * @version 1.0.10.4
+ * @since 1.0.10.4
+ */
 @Slf4j
 public class EvaluationManager {
     private static EvaluationManager instance;

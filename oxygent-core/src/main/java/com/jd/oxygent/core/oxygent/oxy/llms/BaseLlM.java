@@ -510,6 +510,7 @@ public abstract class BaseLlM extends BaseOxy {
      * @return LLM execution response containing generated content and status information
      * @since 1.0.0
      */
+    @Override
     protected abstract OxyResponse _execute(OxyRequest oxyRequest);
 
     /**

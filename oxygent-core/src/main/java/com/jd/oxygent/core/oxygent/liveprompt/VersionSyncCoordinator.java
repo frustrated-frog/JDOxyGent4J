@@ -16,6 +16,16 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 /**
+ * Coordinates version synchronization across multiple instances.
+ *
+ *     This class provides ES polling mechanism for maintaining cache consistency
+ *     across multiple instances by periodically checking version updates in ES.
+ *
+ *     Attributes:
+ *         prompt_manager: The PromptManager instance to synchronize
+ *         use_es_polling: Whether to use ES polling
+ *         polling_task: Async task for ES polling (if enabled)
+ *         polling_interval: Interval in seconds for ES polling
  *
  * @author OxyGent Team
  * @version 1.0.10.4
@@ -191,7 +201,7 @@ public class VersionSyncCoordinator {
      * @param promptKey The prompt key to update
      * @param newVersion The new version number
      */
-    private void handleVersionUpdate(String promptKey, int newVersion) {
+    public void handleVersionUpdate(String promptKey, int newVersion) {
         try {
             // Prevent duplicate updates for the same version
             synchronized (pendingUpdates) {

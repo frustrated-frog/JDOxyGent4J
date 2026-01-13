@@ -1581,7 +1581,7 @@ public class RouteServlet extends HttpServlet {
     }
 
     /**
-     * Get prompt history
+     * Get prompt version history
      */
     private void getPromptHistory(String promptKey, HttpServletResponse response) throws IOException {
         try {

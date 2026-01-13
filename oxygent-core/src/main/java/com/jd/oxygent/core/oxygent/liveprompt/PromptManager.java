@@ -16,6 +16,18 @@ import java.util.Map;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
+ * Live Prompt Management Service for OxyGent framework.
+ *
+ * This module provides dynamic prompt management capabilities, supporting storage and
+ * real-time updates through Elasticsearch or LocalEs backends. It enables hot-swapping
+ * of prompts during runtime and maintains version history for all prompt changes.
+ * The system automatically falls back to LocalEs when Elasticsearch is unavailable.
+ *
+ * Prompt management system with automatic ES/LocalEs fallback.
+ *
+ *     This class provides comprehensive prompt management capabilities including
+ *     storage, retrieval, versioning, and hot-reloading. It automatically switches
+ *     between Elasticsearch and LocalEs backends based on availability.
  *
  * @author OxyGent Team
  * @version 1.0.10.4
@@ -32,8 +44,6 @@ public class PromptManager {
     private ReentrantLock cacheLock = new ReentrantLock();
 
     private BaseEs esClient;
-
-    private VersionSyncCoordinator versionSyncCoordinator;
 
     public PromptManager(String indexName) {
         if (indexName == null) {
@@ -158,8 +168,8 @@ public class PromptManager {
 
             // Update local version tracker for ES polling sync
             int newVersion = (int) doc.get("version");
+            VersionSyncCoordinator.getInstance(this).handleVersionUpdate(promptKey, newVersion);
             updateLocalVersionTracker(promptKey, newVersion);
-
             return true;
         } catch (Exception e) {
             log.error("Failed to save prompt {}: {}", promptKey, e);
@@ -635,8 +645,7 @@ public class PromptManager {
     public void updateLocalVersionTracker(String promptKey, int version) {
         try {
             // Lazy import to avoid circular dependency
-            VersionSyncCoordinator coordinator = VersionSyncCoordinator.getInstance(this);
-            coordinator.updateLocalVersion(promptKey, version);
+            VersionSyncCoordinator.getInstance(this).updateLocalVersion(promptKey, version);
         } catch (Exception e) {
             log.debug("Failed to update local version tracker: {}", e);
         }
@@ -644,8 +653,7 @@ public class PromptManager {
 
     public void startVersionSync() {
         try {
-            VersionSyncCoordinator coordinator = VersionSyncCoordinator.getInstance(this);
-            coordinator.start();
+            VersionSyncCoordinator.getInstance(this).start();
             log.info("Version synchronization started");
         } catch (Exception e) {
             log.error("Failed to start version synchronization: {}", e);
@@ -653,13 +661,11 @@ public class PromptManager {
     }
 
     public void stopVersionSync() {
-        if (versionSyncCoordinator != null) {
-            try {
-                versionSyncCoordinator.stop();
-                log.info("Version synchronization stopped");
-            } catch (Exception e) {
-                log.error("Error stopping version synchronization: {}", e);
-            }
+        try {
+            VersionSyncCoordinator.getInstance(this).stop();
+            log.info("Version synchronization stopped");
+        } catch (Exception e) {
+            log.error("Error stopping version synchronization: {}", e);
         }
     }
 

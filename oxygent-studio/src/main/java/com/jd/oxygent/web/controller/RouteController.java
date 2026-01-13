@@ -31,6 +31,7 @@ import com.jd.oxygent.core.oxygent.utils.CommonUtils;
 import com.jd.oxygent.core.oxygent.utils.DataUtils;
 import com.jd.oxygent.web.adapter.FileItemAdapter;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -1393,7 +1394,7 @@ public class RouteController {
     }
 
     /**
-     * Get prompt history
+     * Get prompt version history
      */
     @GetMapping("/api/prompts/{prompt_key}/history")
     public ResponseEntity<Map<String, Object>> getPromptHistory(@PathVariable("prompt_key") String promptKey) {
@@ -1405,6 +1406,80 @@ public class RouteController {
             responseData.put("message", "Successfully retrieved prompt history");
             responseData.put("data", history);
             
+            return ResponseEntity.ok(responseData);
+        } catch (Exception e) {
+            log.error("Get prompt history failed: " + promptKey, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to get prompt history: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get specific version of a prompt
+     */
+    @GetMapping("/api/prompts/{prompt_key}/version/{version}")
+    public ResponseEntity<Map<String, Object>> getPromptVersion(@PathVariable("prompt_key") String promptKey, @PathVariable("version") Integer version) {
+        try {
+            // Get version history
+            List<Map<String, Object>> history = promptManager.getPromptHistory(promptKey);
+
+            // Find the specific version
+            Map<String, Object> targetVersion = null;
+            for (Map<String, Object> hist : history) {
+                if (Integer.parseInt(hist.get("version").toString()) == version) {
+                    targetVersion = hist;
+                    break;
+                }
+            }
+
+            if (targetVersion == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(WebResponse.error(HttpStatus.NOT_FOUND.value(), "Version " + version + " not found for prompt " + promptKey).toMap());
+            }
+
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("success", true);
+            responseData.put("message", "Successfully retrieved prompt history");
+            responseData.put("data", targetVersion);
+
+            return ResponseEntity.ok(responseData);
+        } catch (Exception e) {
+            log.error("Get prompt history failed: " + promptKey, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to get prompt history: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Revert prompt to specific version
+     */
+    @PostMapping("/api/prompts/{prompt_key}/revert/{target_version}")
+    public ResponseEntity<Map<String, Object>> revertPromptToVersion(@PathVariable("prompt_key") String promptKey, @PathVariable("target_version") Integer targetVersion) {
+        try {
+            // Check if prompt exists
+            Map<String, Object> existing = promptManager.getPrompt(promptKey, false);
+            if (existing == null) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(WebResponse.error(HttpStatus.NOT_FOUND.value(), "Prompt not found").toMap());
+            }
+
+            // Revert to target version
+            boolean success = promptManager.revertToVersion(promptKey, targetVersion);
+
+            if (!success) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(WebResponse.error(HttpStatus.BAD_REQUEST.value(), "Failed to revert to version " + targetVersion).toMap());
+            }
+
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully reverted " + promptKey + " to version " + targetVersion,
+                    "data", Map.of(
+                            "prompt_key", promptKey,
+                            "reverted_to_version", targetVersion,
+                            "revert_time", LocalDateTime.now().format(DATE_TIME_FORMATTER)
+                    )
+            );
             return ResponseEntity.ok(responseData);
         } catch (Exception e) {
             log.error("Get prompt history failed: " + promptKey, e);

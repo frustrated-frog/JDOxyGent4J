@@ -215,8 +215,8 @@ public class RemoteEs extends BaseDB implements BaseEs {
                 return Map.of("error", "Invalid parameters");
             }
             String json = JsonUtils.toJSONString(body);
-            log.info("RemoteEs.termQueryBySearchRequest request params: indexName={}, body={}", indexName, json);
-            validateIndexName(indexName, "termQueryBySearchRequest");
+            log.info("RemoteEs.search request params: indexName={}, body={}", indexName, json);
+            validateIndexName(indexName, "search");
 
             JsonNode rootNode = JsonUtils.readTree(json);
 
@@ -261,7 +261,7 @@ public class RemoteEs extends BaseDB implements BaseEs {
             }
             SearchRequest searchRequest = new SearchRequest(indexName);
             searchRequest.source(sourceBuilder);
-            List<Map<String, Object>> searchResults = executeSearchRequest(searchRequest, "RemoteEs.termQueryBySearchRequest");
+            List<Map<String, Object>> searchResults = executeSearchRequest(searchRequest, "RemoteEs.search");
 
             List<Map<String, Object>> limitedDocs = new ArrayList<>();
             if (searchResults != null) {

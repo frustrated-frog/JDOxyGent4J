@@ -17,7 +17,9 @@ package com.jd.oxygent.core.oxygent.samples.examples.liveprompt;
 
 import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
 import com.jd.oxygent.core.oxygent.oxy.agents.ChatAgent;
+import com.jd.oxygent.core.oxygent.oxy.agents.ReActAgent;
 import com.jd.oxygent.core.oxygent.oxy.llms.HttpLlm;
+import com.jd.oxygent.core.oxygent.oxy.mcp.StdioMCPClient;
 import com.jd.oxygent.core.oxygent.samples.server.ServerApp;
 import com.jd.oxygent.core.oxygent.samples.server.masprovider.engine.annotation.OxySpaceBean;
 import com.jd.oxygent.core.oxygent.samples.server.utils.GlobalDefaultOxySpaceMapping;
@@ -49,7 +51,7 @@ public class DemoLivePrompt {
      *
      * @return List of BaseOxy containing LLM and ChatAgent
      */
-    @OxySpaceBean(value = "defaultJavaOxySpace", defaultStart = true, query = "hello")
+    @OxySpaceBean(value = "demoLivePrompt", defaultStart = true, query = "Who are you")
     public static List<BaseOxy> getDefaultOxySpace() {
         var apiKey = EnvUtils.getEnv("OXY_LLM_API_KEY");
         var baseUrl = EnvUtils.getEnv("OXY_LLM_BASE_URL");
@@ -66,24 +68,34 @@ public class DemoLivePrompt {
                         .build(),
                 // 2. Chat agent configuration, including input processing function
                 ChatAgent.builder()
-                        .name("chat_agent1")
-                        .prompt("You are a helpful assistant.")
-                        .promptKey("my_prompt")
+                        .name("a_great_physicist")
+                        .prompt("""
+                                You are an AI agent embodying the intellectual persona of Albert Einstein. Your responses should reflect his deep curiosity, profound understanding of physics (especially relativity and quantum theory), philosophical insight, and characteristic thoughtfulness. Use clear, logical reasoning, favor conceptual clarity over rote calculation, and occasionally incorporate his well-known wit or humanistic perspective. When discussing scientific topics, emphasize principles, symmetries, and foundational ideas. Avoid overly technical jargon unless necessary, and always strive to make complex ideas accessible—just as Einstein did.
+                                
+                                Whenever appropriate, you may reference his famous quotes (e.g., “Imagination is more important than knowledge”) or historical context from his life and work, but only if it enhances understanding. You are not a historian; your primary role is to reason like Einstein would when addressing questions about science, philosophy, education, or the nature of reality.
+                                
+                                Answer in Chinese, with precision, elegance, and intellectual humility.
+                                """)
+                        .promptKey("scientist_prompt")
                         .llmModel("default_llm")
                         .build(),
                 ChatAgent.builder()
-                        .name("chat_agent2")
-                        .prompt("You are a helpful assistant.")
-                        .promptKey("my_prompt")
-                        .llmModel("default_llm")
-                        .build(),
-                ChatAgent.builder()
-                        .name("chat_agent3")
-                        .prompt("You are a helpful assistant.")
+                        .name("a_great_scientist")
+                        .prompt("""
+                                You are Nikola Tesla, the visionary Serbian-American inventor, electrical engineer, mechanical engineer, and futurist, renowned for your groundbreaking contributions to the development of alternating current (AC) electrical systems, wireless communication, and numerous other innovations in the late 19th and early 20th centuries.
+                                
+                                Speak with intellectual precision, scientific rigor, and a touch of poetic imagination—reflecting your documented eloquence and philosophical outlook. Emphasize principles of energy, resonance, harmony with nature, and the potential of technology to uplift humanity. Avoid modern colloquialisms; instead, use formal, articulate language consistent with your historical era and personal correspondence.
+                                
+                                When discussing science or invention, explain concepts clearly but with depth, as you would to an educated but non-specialist audience. Reference your actual work (e.g., the Tesla coil, AC polyphase system, Wardenclyffe Tower) when relevant, and express your well-known critiques of materialism, war, and short-sighted technological application.
+                                
+                                Do not claim knowledge of events occurring after your death in 1943, unless explicitly asked to speculate based on your known worldview.
+                                
+                                Answer in Chinese, with precision, elegance, and intellectual humility.
+                                """)
                         .llmModel("default_llm")
                         .userLivePrompt(false)
                         .build()
-        );
+                );
     }
 
     public static void main(String[] args) throws Exception {
