@@ -1,5 +1,6 @@
 package com.jd.oxygent.infra.databases.es;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.jd.oxygent.core.oxygent.infra.databases.BaseDB;
 import com.jd.oxygent.core.oxygent.infra.databases.BaseEs;
 import com.jd.oxygent.core.oxygent.utils.JsonUtils;
@@ -23,18 +24,23 @@ import org.elasticsearch.action.update.UpdateRequest;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.xcontent.XContentType;
-import org.elasticsearch.index.query.BoolQueryBuilder;
+import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.SearchHits;
 import org.elasticsearch.search.builder.SearchSourceBuilder;
+import org.elasticsearch.search.sort.SortBuilder;
+import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
-import org.springframework.util.CollectionUtils;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Remote Elasticsearch implementation.
@@ -206,20 +212,48 @@ public class RemoteEs extends BaseDB implements BaseEs {
                 log.warn("Invalid parameters for search, indexName={}, body={}", indexName, body);
                 return Map.of("error", "Invalid parameters");
             }
+            String json = JsonUtils.toJSONString(body);
+            log.info("RemoteEs.termQueryBySearchRequest request params: indexName={}, body={}", indexName, json);
+            validateIndexName(indexName, "termQueryBySearchRequest");
 
-            List<Map<String, Object>> searchResults;
-            if (body.get("query") instanceof Map && ((Map<?, ?>) body.get("query")).get("term") instanceof Map) {
-                Map<String, Object> termQueryMap = (Map<String, Object>) ((Map) body.get("query")).get("term");
-                searchResults = termQueryByPage(indexName, termQueryMap, 1, 10, null, null);
-            } else {
-                searchResults = termQueryBySearchRequest(indexName, body);
+            JsonNode rootNode = JsonUtils.readTree(json);
+
+            JsonNode queryNode = rootNode.get("query");
+            String queryJson = (queryNode != null) ? queryNode.toString() : "{}";
+            QueryBuilder queryBuilder = QueryBuilders.wrapperQuery(queryJson);
+
+            List<SortBuilder<?>> sortBuilders = new ArrayList<>();
+            JsonNode sortNode = rootNode.get("sort");
+            if (sortNode != null && sortNode.isArray()) {
+                for (JsonNode sortItem : sortNode) {
+                    Iterator<String> fieldNames = sortItem.fieldNames();
+                    while (fieldNames.hasNext()) {
+                        String fieldName = fieldNames.next();
+                        JsonNode options = sortItem.get(fieldName);
+
+                        SortOrder order = SortOrder.ASC;
+                        if (options.has("order")) {
+                            String orderStr = options.get("order").asText().toLowerCase();
+                            order = "desc".equals(orderStr) ? SortOrder.DESC : SortOrder.ASC;
+                        }
+                        SortBuilder<?> sortBuilder = SortBuilders.fieldSort(fieldName).order(order);
+                        sortBuilders.add(sortBuilder);
+                    }
+                }
             }
+            SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
+            sourceBuilder.query(queryBuilder);
+            for (SortBuilder<?> sortBuilder : sortBuilders) {
+                sourceBuilder.sort(sortBuilder);
+            }
+            SearchRequest searchRequest = new SearchRequest(indexName);
+            searchRequest.source(sourceBuilder);
+            List<Map<String, Object>> searchResults = executeSearchRequest(searchRequest, "RemoteEs.termQueryBySearchRequest");
 
             List<Map<String, Object>> limitedDocs = new ArrayList<>();
             if (searchResults != null) {
                 searchResults.forEach(searchResult -> limitedDocs.add(Map.of("_source", searchResult.get("source"))));
             }
-
             return Map.of("hits", Map.of("hits", limitedDocs));
         } catch (Exception e) {
             return handleException(e, "search");
@@ -407,77 +441,6 @@ public class RemoteEs extends BaseDB implements BaseEs {
         }
     }
 
-    public List<Map<String, Object>> termQueryByPage(String indexName, Map<String, Object> termQueryMap,
-                                                     int page, int pageSize, Object[] searchAfter,
-                                                     Map<String, SortOrder> sortMap) {
-        log.info("RemoteEs.termQueryByPage request params: indexName={}, termQueryMap={}, page={}, pageSize={}",
-                indexName, termQueryMap, page, pageSize);
-
-        validateIndexName(indexName, "termQueryByPage");
-        if (pageSize <= 0) {
-            log.error("RemoteEs.termQueryByPage invalid parameter: pageSize={}", pageSize);
-            throw new IllegalArgumentException("pageSize must be greater than 0");
-        }
-
-        // Build search request
-        SearchRequest searchRequest = new SearchRequest(indexName);
-        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder();
-
-        // Add query conditions
-        BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
-        if (termQueryMap != null) {
-            for (Map.Entry<String, Object> entry : termQueryMap.entrySet()) {
-                boolQuery.must(QueryBuilders.termQuery(entry.getKey(), entry.getValue()));
-            }
-        }
-        sourceBuilder.query(boolQuery);
-        sourceBuilder.size(pageSize);
-
-        // Add range conditions
-        if (searchAfter != null) {
-            sourceBuilder.searchAfter(searchAfter);
-        }
-        // Add sorting
-        if (!CollectionUtils.isEmpty(sortMap)) {
-            for (Map.Entry<String, SortOrder> entry : sortMap.entrySet()) {
-                sourceBuilder.sort(entry.getKey(), entry.getValue());
-            }
-        }
-
-        searchRequest.source(sourceBuilder);
-        return executeSearchRequest(searchRequest, "RemoteEs.termQueryByPage");
-    }
-
-
-    public List<Map<String, Object>> termQueryBySearchRequest(String indexName, Map<String, Object> body) {
-        log.info("RemoteEs.termQueryBySearchRequest request params: indexName={}, body={}", indexName, body);
-
-        validateIndexName(indexName, "termQueryBySearchRequest");
-
-        // Extract query parameters
-        QueryParams queryParams = extractQueryParams(body);
-
-        // Build query
-        BoolQueryBuilder boolQuery = QueryBuilders.boolQuery()
-                .must(QueryBuilders.termsQuery("trace_id", queryParams.traceIdValue))
-                .must(QueryBuilders.termQuery("session_name", queryParams.sessionNameValue));
-
-        SearchSourceBuilder sourceBuilder = new SearchSourceBuilder()
-                .query(boolQuery)
-                .size(queryParams.size);
-
-        if (queryParams.sortList != null) {
-            queryParams.sortList.forEach(sort -> {
-                sourceBuilder.sort(sort.keySet().iterator().next(), SortOrder.fromString(sort.get(sort.keySet().iterator().next()).get("order").toString()));
-            });
-        }
-
-        SearchRequest searchRequest = new SearchRequest(indexName);
-        searchRequest.source(sourceBuilder);
-
-        return executeSearchRequest(searchRequest, "RemoteEs.termQueryBySearchRequest");
-    }
-
     @Override
     public Map<String, Object> delete(String indexName, String docId) {
         BulkRequest request = new BulkRequest();
@@ -520,79 +483,6 @@ public class RemoteEs extends BaseDB implements BaseEs {
                 log.debug("Bulk delete completed; request contains {} operations", request.numberOfActions());
             }
         }
-    }
-
-    /**
-     * Extract query parameters.
-     */
-    private QueryParams extractQueryParams(Map<String, Object> body) {
-        QueryParams params = new QueryParams();
-        params.traceIdValue = new ArrayList<>();
-        params.sessionNameValue = "";
-        params.size = 10; // default value
-
-        Object queryObj = body.get("query");
-        if (!(queryObj instanceof Map)) {
-            return params;
-        }
-        params.sortList = (List) body.get("sort");
-
-        Map<?, ?> queryMap = (Map<?, ?>) queryObj;
-        Object boolObj = queryMap.get("bool");
-        if (!(boolObj instanceof Map)) {
-            return params;
-        }
-
-        Map<?, ?> boolMap = (Map<?, ?>) boolObj;
-        Object mustObj = boolMap.get("must");
-        if (!(mustObj instanceof List) || ((List<?>) mustObj).isEmpty()) {
-            return params;
-        }
-
-        List<?> mustList = (List<?>) mustObj;
-
-        // Extract trace_id from the first 'must' condition
-        if (mustList.size() > 0 && mustList.get(0) instanceof Map) {
-            Map<?, ?> firstMust = (Map<?, ?>) mustList.get(0);
-            Object termsObj = firstMust.get("terms");
-            if (termsObj instanceof Map) {
-                Map<?, ?> termsMap = (Map<?, ?>) termsObj;
-                Object traceIdObj = termsMap.get("trace_id");
-                if (traceIdObj instanceof List) {
-                    params.traceIdValue = (List<String>) traceIdObj;
-                }
-            }
-        }
-
-        // Extract session_name from the second 'must' condition
-        if (mustList.size() > 1 && mustList.get(1) instanceof Map) {
-            Map<?, ?> secondMust = (Map<?, ?>) mustList.get(1);
-            Object termObj = secondMust.get("term");
-            if (termObj instanceof Map) {
-                Map<?, ?> termMap = (Map<?, ?>) termObj;
-                Object sessionNameObj = termMap.get("session_name");
-                if (sessionNameObj instanceof String) {
-                    params.sessionNameValue = (String) sessionNameObj;
-                }
-            }
-        }
-
-        // Extract size parameter
-        Object sizeObj = body.get("size");
-        if (sizeObj instanceof Integer) {
-            params.size = (Integer) sizeObj;
-        }
-        return params;
-    }
-
-    /**
-     * Query parameter wrapper class.
-     */
-    private static class QueryParams {
-        List<Map<String, Map<String, String>>> sortList;
-        List<String> traceIdValue;
-        String sessionNameValue;
-        int size;
     }
 
     @Override

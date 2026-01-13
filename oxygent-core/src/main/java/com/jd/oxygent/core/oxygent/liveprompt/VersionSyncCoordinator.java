@@ -81,7 +81,7 @@ public class VersionSyncCoordinator {
 
         // Start ES polling if enabled
         if (useEsPolling) {
-            startEsPolling();
+//            startEsPolling(); FIXME
         }
 
         log.info("Version sync coordinator started");
@@ -108,7 +108,7 @@ public class VersionSyncCoordinator {
         for (Map.Entry<String, Map<String, Object>> entry : cacheSnapshot.entrySet()) {
             String promptKey = entry.getKey();
             Map<String, Object> promptData = entry.getValue();
-            int version = ((Long) promptData.getOrDefault("version", 1)).intValue();
+            int version = promptData.getOrDefault("version", 1) instanceof Long ? ((Long) promptData.getOrDefault("version", 1)).intValue() : (Integer) promptData.getOrDefault("version", 1);
             localVersions.put(promptKey, version);
         }
     }
@@ -156,12 +156,11 @@ public class VersionSyncCoordinator {
     private void checkEsVersions() {
         try {
             // Get all prompts from ES
-            Map<String, Object> searchBody = new HashMap<>();
-            Map<String, Object> query = new HashMap<>();
-            query.put("match_all", Map.of());
-            searchBody.put("query", query);
-            searchBody.put("size", 1000);
-            searchBody.put("_source", List.of("version", "updated_at"));
+            Map<String, Object> searchBody = Map.of(
+                    "query", Map.of("match_all", Map.of()),
+                    "size", 1000,
+                    "_source", List.of("version", "updated_at")
+            );
 
             Map<String, Object> response = promptManager.getEsClient().search(promptManager.getIndexName(), searchBody);
 
@@ -176,7 +175,7 @@ public class VersionSyncCoordinator {
                     String promptKey = (String) hit.get("_id");
                     Map<String, Object> source = (Map<String, Object>) hit.get("_source");
                     if (source != null) {
-                        int remoteVersion = ((Long) source.getOrDefault("version", 1)).intValue();
+                        int remoteVersion = source.getOrDefault("version", 1) instanceof Long ? ((Long) source.getOrDefault("version", 1)).intValue() : (Integer) source.getOrDefault("version", 1);
 
                         // Check if local version is behind
                         int localVersion = localVersions.getOrDefault(promptKey, 0);
@@ -249,7 +248,7 @@ public class VersionSyncCoordinator {
                 Map<String, Object> promptData = promptManager.getPrompt(promptKey, false);
 
                 if (promptData != null) {
-                    int actualVersion = ((Long) promptData.getOrDefault("version", 1)).intValue();
+                    int actualVersion = promptData.getOrDefault("version", 1) instanceof Long ? ((Long) promptData.getOrDefault("version", 1)).intValue() : (Integer) promptData.getOrDefault("version", 1);
                     if (actualVersion == newVersion) {
                         // Update local version tracker
                         localVersions.put(promptKey, newVersion);

@@ -1,7 +1,11 @@
 package com.jd.oxygent.core.oxygent.schemas.evaluation;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+
 public enum RatingType {
+    @JsonAlias({"like"})
     LIKE("like"),
+    @JsonAlias({"dislike"})
     DISLIKE("dislike");
 
     private final String value;

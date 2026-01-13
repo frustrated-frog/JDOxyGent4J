@@ -1,7 +1,11 @@
 package com.jd.oxygent.core.oxygent.schemas.evaluation;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class RatingRequest {
+    @JsonProperty("trace_id")
     private String traceId;
+    @JsonProperty("rating_type")
     private RatingType ratingType;
     private String comment;
     private String erp;

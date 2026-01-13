@@ -201,8 +201,7 @@ public class RouteServlet extends HttpServlet {
      * Health check endpoint
      */
     private void checkAlive(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Map<String, Object> result = new HashMap<>();
-        result.put("alive", 1);
+        Map<String, Object> result = Map.of("alive", 1);
         sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(result).toMap());
     }
 
@@ -263,12 +262,9 @@ public class RouteServlet extends HttpServlet {
             File dir = new File(scriptSaveDir);
             String[] files = dir.list((d, name) -> name.endsWith(".json"));
 
-            List<String> scripts = new ArrayList<>();
-            if (files != null) {
-                scripts = Arrays.stream(files)
-                        .map(file -> file.substring(0, file.lastIndexOf(".")))
-                        .collect(Collectors.toList());
-            }
+            List<String> scripts = files != null ? Arrays.stream(files)
+                    .map(file -> file.substring(0, file.lastIndexOf(".")))
+                    .collect(Collectors.toList()) : List.of();
 
             Map<String, Object> data = Map.of("scripts", scripts);
             sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(data).toMap());
@@ -285,8 +281,7 @@ public class RouteServlet extends HttpServlet {
      */
     private void groupId(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
-            Map<String, Object> result = new HashMap<>();
-            result.put("uuid", UuidCreator.getShortSuffixComb().toString());
+            Map<String, Object> result = Map.of("uuid", UuidCreator.getShortSuffixComb().toString());
             sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(result).toMap());
         } catch (Exception e) {
             log.error("group_uid generate failed", e);
@@ -300,8 +295,7 @@ public class RouteServlet extends HttpServlet {
      */
     private void traceId(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
-            Map<String, Object> result = new HashMap<>();
-            result.put("uuid", UuidCreator.getShortSuffixComb().toString());
+            Map<String, Object> result = Map.of("uuid", UuidCreator.getShortSuffixComb().toString());
             sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(result).toMap());
         } catch (Exception e) {
             log.error("trace_uid generate failed", e);
@@ -348,7 +342,7 @@ public class RouteServlet extends HttpServlet {
     private Map<String, Object> readRequestParam(HttpServletRequest request, String paramName) throws IOException {
         String paramValue = request.getParameter(paramName);
         if (paramValue == null || paramValue.trim().isEmpty()) {
-            return new HashMap<>();
+            return Map.of();
         }
         return objectMapper.readValue(paramValue, Map.class);
     }
@@ -640,8 +634,7 @@ public class RouteServlet extends HttpServlet {
             }
 
             // Search nodes
-            Map<String, Object> query = new HashMap<>();
-            query.put("query", Map.of("term", Map.of("_id", itemId)));
+            Map<String, Object> query = Map.of("query", Map.of("term", Map.of("_id", itemId)));
 
             Map<String, Object> esResponse = mas.getEsClient().search(Config.getAppName() + "_node", query);
 
@@ -705,7 +698,7 @@ public class RouteServlet extends HttpServlet {
 
                     // Remove prompt
                     Map<String, Object> input = (Map<String, Object>) nodeData.get("input");
-                    Map<String, Object> classAttr = input != null ? (Map<String, Object>) input.get("class_attr") : new HashMap();
+                    Map<String, Object> classAttr = input != null ? (Map<String, Object>) input.get("class_attr") : Map.of();
                     if (classAttr.containsKey("prompt")) {
                         classAttr.remove("prompt");
                     }
@@ -719,8 +712,8 @@ public class RouteServlet extends HttpServlet {
                     nodeData.put("data_range_map", dataRangeMap);
 
                     List<Map<String, Object>> trees = Arrays.asList(classAttr,
-                            (Map<String, Object>) classAttr.getOrDefault("llm_params", new HashMap<>()),
-                            input != null ? (Map<String, Object>) input.get("arguments") : new HashMap());
+                            (Map<String, Object>) classAttr.getOrDefault("llm_params", Map.of()),
+                            input != null ? (Map<String, Object>) input.get("arguments") : Map.of());
 
                     for (Map<String, Object> tree : trees) {
                         if (tree == null) {
@@ -849,7 +842,7 @@ public class RouteServlet extends HttpServlet {
 
             // Process environment variables pattern matching
             List<Map<String, Object>> trees = Arrays.asList(item.getClassAttr(),
-                    (Map<String, Object>) item.getClassAttr().getOrDefault("llm_params", new HashMap<>()),
+                    (Map<String, Object>) item.getClassAttr().getOrDefault("llm_params", Map.of()),
                     item.getArguments()
             );
 
@@ -966,7 +959,7 @@ public class RouteServlet extends HttpServlet {
             // Deduplicate attachments
             payload.put("attachments", attachmentsWithPath);
             if (!remoteUrls.isEmpty()) {
-                List<String> existingUrls = (List<String>) payload.getOrDefault("web_file_url_list", new ArrayList<>());
+                List<String> existingUrls = (List<String>) payload.getOrDefault("web_file_url_list", List.of());
                 Set<String> allUrls = new LinkedHashSet<>(existingUrls);
                 allUrls.addAll(remoteUrls);
                 payload.put("web_file_url_list", new ArrayList<>(allUrls));
@@ -978,11 +971,11 @@ public class RouteServlet extends HttpServlet {
         }
 
         // Set current trace_id
-        payload.putIfAbsent("current_trace_id", CommonUtils.generateShortUUID());
-        // Get request headers
-        payload.putIfAbsent("shared_data", new HashMap<String, Object>());
-        // Add request headers
-        ((Map<String, Object>) payload.get("shared_data")).put("_headers", headers);
+            payload.putIfAbsent("current_trace_id", CommonUtils.generateShortUUID());
+            // Get request headers
+            payload.putIfAbsent("shared_data", Map.of());
+            // Add request headers
+            ((Map<String, Object>) payload.get("shared_data")).put("_headers", headers);
 
         return payload;
     }
@@ -1107,8 +1100,7 @@ public class RouteServlet extends HttpServlet {
             Files.copy(fileItem.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
             // Return file path
-            Map<String, Object> data = new HashMap<>();
-            data.put("file_name", fileName);
+            Map<String, Object> data = Map.of("file_name", fileName);
             sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(data).toMap());
         } catch (Exception e) {
             log.error("File upload failed", e);
@@ -1302,10 +1294,11 @@ public class RouteServlet extends HttpServlet {
 
             List<Map<String, Object>> prompts = promptManager.listPrompts(category, agentType, isActive, tags);
 
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("success", true);
-            responseData.put("message", "Successfully retrieved prompt list");
-            responseData.put("data", prompts);
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully retrieved prompt list",
+                    "data", prompts
+            );
 
             sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
         } catch (Exception e) {
@@ -1330,10 +1323,11 @@ public class RouteServlet extends HttpServlet {
 
             List<Map<String, Object>> results = promptManager.searchPrompts(keyword, category);
 
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("success", true);
-            responseData.put("message", "Successfully searched prompts");
-            responseData.put("data", results);
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully searched prompts",
+                    "data", results
+            );
 
             sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
         } catch (Exception e) {
@@ -1350,13 +1344,14 @@ public class RouteServlet extends HttpServlet {
         try {
             boolean success = DynamicAgentManager.hotReloadPrompt(promptKey);
 
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("success", success);
-            responseData.put("message", "Successfully hot reloaded prompt");
-            responseData.put("data", Map.of(
-                    "prompt_key", promptKey,
-                    "hot_reload_success", success
-            ));
+            Map<String, Object> responseData = Map.of(
+                    "success", success,
+                    "message", "Successfully hot reloaded prompt",
+                    "data", Map.of(
+                            "prompt_key", promptKey,
+                            "hot_reload_success", success
+                    )
+            );
 
             sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
         } catch (Exception e) {
@@ -1373,13 +1368,14 @@ public class RouteServlet extends HttpServlet {
         try {
             boolean success = DynamicAgentManager.hotReloadAgent(agentName);
 
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("success", success);
-            responseData.put("message", "Successfully hot reloaded agent prompt");
-            responseData.put("data", Map.of(
-                    "agent_name", agentName,
-                    "hot_reload_success", success
-            ));
+            Map<String, Object> responseData = Map.of(
+                    "success", success,
+                    "message", "Successfully hot reloaded agent prompt",
+                    "data", Map.of(
+                            "agent_name", agentName,
+                            "hot_reload_success", success
+                    )
+            );
 
             sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
         } catch (Exception e) {
@@ -1396,13 +1392,14 @@ public class RouteServlet extends HttpServlet {
         try {
             boolean results = DynamicAgentManager.hotReloadAllPrompts();
 
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("success", results);
-            responseData.put("message", "Successfully completed batch hot reload");
-            responseData.put("data", Map.of(
-                    "reload_success", results,
-                    "reload_time", LocalDateTime.now().format(DATE_TIME_FORMATTER)
-            ));
+            Map<String, Object> responseData = Map.of(
+                    "success", results,
+                    "message", "Successfully completed batch hot reload",
+                    "data", Map.of(
+                            "reload_success", results,
+                            "reload_time", LocalDateTime.now().format(DATE_TIME_FORMATTER)
+                    )
+            );
             sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
         } catch (Exception e) {
             log.error("Hot reload all prompts failed", e);
@@ -1426,10 +1423,11 @@ public class RouteServlet extends HttpServlet {
 
             prompt.put("id", promptKey);
 
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("success", true);
-            responseData.put("message", "Successfully retrieved prompt");
-            responseData.put("data", prompt);
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully retrieved prompt",
+                    "data", prompt
+            );
 
             sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
         } catch (Exception e) {
@@ -1452,7 +1450,7 @@ public class RouteServlet extends HttpServlet {
             String category = (String) requestBody.getOrDefault("category", "custom");
             String agentType = (String) requestBody.getOrDefault("agent_type", "");
             boolean isActive = (boolean) requestBody.getOrDefault("is_active", true);
-            List<String> tags = (List<String>) requestBody.getOrDefault("tags", new ArrayList<>());
+            List<String> tags = (List<String>) requestBody.getOrDefault("tags", List.of());
             String createdBy = (String) requestBody.getOrDefault("created_by", "user");
 
             // Check if prompt already exists
@@ -1472,10 +1470,11 @@ public class RouteServlet extends HttpServlet {
                 return;
             }
 
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("success", true);
-            responseData.put("message", "Successfully created prompt");
-            responseData.put("data", Map.of("prompt_key", promptKey));
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully created prompt",
+                    "data", Map.of("prompt_key", promptKey)
+            );
 
             sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
         } catch (Exception e) {
@@ -1512,10 +1511,11 @@ public class RouteServlet extends HttpServlet {
             boolean hasChanges = promptContent != null && !promptContent.equals(existing.get("prompt_content"));
 
             if (!hasChanges) {
-                Map<String, Object> responseData = new HashMap<>();
-                responseData.put("success", false);
-                responseData.put("message", "No changes detected; update the prompt before saving.");
-                responseData.put("data", Map.of("prompt_key", promptKey));
+                Map<String, Object> responseData = Map.of(
+                        "success", false,
+                        "message", "No changes detected; update the prompt before saving.",
+                        "data", Map.of("prompt_key", promptKey)
+                );
                 sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
                 return;
             }
@@ -1530,10 +1530,11 @@ public class RouteServlet extends HttpServlet {
                 return;
             }
 
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("success", true);
-            responseData.put("message", "Successfully updated prompt");
-            responseData.put("data", Map.of("prompt_key", promptKey));
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully updated prompt",
+                    "data", Map.of("prompt_key", promptKey)
+            );
 
             sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
         } catch (Exception e) {
@@ -1556,10 +1557,11 @@ public class RouteServlet extends HttpServlet {
                 return;
             }
 
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("success", true);
-            responseData.put("message", "Successfully deleted prompt");
-            responseData.put("data", Map.of("prompt_key", promptKey));
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully deleted prompt",
+                    "data", Map.of("prompt_key", promptKey)
+            );
 
             sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
         } catch (Exception e) {
@@ -1576,10 +1578,11 @@ public class RouteServlet extends HttpServlet {
         try {
             List<Map<String, Object>> history = promptManager.getPromptHistory(promptKey);
 
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("success", true);
-            responseData.put("message", "Successfully retrieved prompt history");
-            responseData.put("data", history);
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully retrieved prompt history",
+                    "data", history
+            );
 
             sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
         } catch (Exception e) {
@@ -1611,14 +1614,15 @@ public class RouteServlet extends HttpServlet {
                 return;
             }
 
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("success", true);
-            responseData.put("message", "Successfully reverted " + promptKey + " to version " + targetVersion);
-            responseData.put("data", Map.of(
-                    "prompt_key", promptKey,
-                    "reverted_to_version", targetVersion,
-                    "revert_time", LocalDateTime.now().format(DATE_TIME_FORMATTER)
-            ));
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully reverted " + promptKey + " to version " + targetVersion,
+                    "data", Map.of(
+                            "prompt_key", promptKey,
+                            "reverted_to_version", targetVersion,
+                            "revert_time", LocalDateTime.now().format(DATE_TIME_FORMATTER)
+                    )
+            );
 
             sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
         } catch (Exception e) {
@@ -1651,10 +1655,11 @@ public class RouteServlet extends HttpServlet {
                 return;
             }
 
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("success", true);
-            responseData.put("message", "Successfully retrieved version " + version + " of prompt " + promptKey);
-            responseData.put("data", targetVersion);
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully retrieved version " + version + " of prompt " + promptKey,
+                    "data", targetVersion
+            );
 
             sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
         } catch (Exception e) {
@@ -1854,7 +1859,7 @@ public class RouteServlet extends HttpServlet {
      */
     private void rebuildRatingStats(String traceId, HttpServletResponse response) throws IOException {
         try {
-            RatingStats stats = EvaluationManager.getInstance().updateRatingStats(traceId, Optional.empty());
+            RatingStats stats = EvaluationManager.getInstance().updateRatingStats(traceId, null);
 
             Map<String, Object> responseData = new HashMap<>();
             responseData.put("trace_id", traceId);
@@ -1901,272 +1906,8 @@ public class RouteServlet extends HttpServlet {
             String ratingFilter = CommonUtils.getOrDefault(request.getParameter("rating_filter"), "all");
             String searchTerm = CommonUtils.getOrDefault(request.getParameter("search_term"), "");
 
-            // Build search query
-            Map<String, Object> searchQuery = new HashMap<>();
-            searchQuery.put("match_all", new HashMap<>());
-
-            if (searchTerm != null && !searchTerm.strip().isEmpty()) {
-                Map<String, Object> boolQuery = new HashMap<>();
-                List<Map<String, Object>> shouldClauses = new ArrayList<>();
-
-                Map<String, Object> termTraceId = new HashMap<>();
-                termTraceId.put("term", Map.of("trace_id", searchTerm));
-                shouldClauses.add(termTraceId);
-
-                Map<String, Object> matchInput = new HashMap<>();
-                matchInput.put("match", Map.of("input", searchTerm));
-                shouldClauses.add(matchInput);
-
-                Map<String, Object> matchCallee = new HashMap<>();
-                matchCallee.put("match", Map.of("callee", searchTerm));
-                shouldClauses.add(matchCallee);
-
-                Map<String, Object> matchOutput = new HashMap<>();
-                matchOutput.put("match", Map.of("output", searchTerm));
-                shouldClauses.add(matchOutput);
-
-                boolQuery.put("should", shouldClauses);
-                boolQuery.put("minimum_should_match", 1);
-                searchQuery.put("bool", boolQuery);
-            }
-
-            // Calculate how many traces we need to fetch
-            int fetchSize = pageSize * 10;
-
-            log.info(String.format("Fetching history: page=%d, page_size=%d, fetch_size=%d, rating_filter=%s, search_term=%s",
-                    page, pageSize, fetchSize, ratingFilter, searchTerm));
-
-            Map<String, Object> searchBody = new HashMap<>();
-            searchBody.put("query", searchQuery);
-            searchBody.put("size", fetchSize);
-            searchBody.put("_source", List.of("trace_id", "group_id", "create_time"));
-            searchBody.put("sort", List.of(Map.of("create_time", Map.of("order", "desc"))));
-
-            Map<String, Object> tracesResponse = mas.getEsClient().search(Config.getAppName() + "_trace", searchQuery);
-
-            // Fetch traces with minimal fields for grouping
-            // This is a placeholder and needs to be replaced with actual ES search implementation
-            List<Map<String, Object>> traceHits = (List<Map<String, Object>>) ((Map<String, Object>) tracesResponse.get("hits")).get("hits");
-            log.debug("Retrieved " + traceHits.size() + " traces from database");
-            // Group traces by group_id
-            Map<String, Map<String, Object>> groupsMetadataDict = new HashMap<>();
-
-            for (Map<String, Object> hit : traceHits) {
-                try {
-                    Map<String, Object> source = (Map<String, Object>) hit.get("_source");
-                    String traceId = (String) source.get("trace_id");
-                    String groupId = (String) source.getOrDefault("group_id", traceId);
-                    String createTime = (String) source.get("create_time");
-
-                    if (traceId == null || traceId.isEmpty()) {
-                        continue;
-                    }
-
-                    groupsMetadataDict.computeIfAbsent(groupId, k -> {
-                        Map<String, Object> metadata = new HashMap<>();
-                        metadata.put("group_id", groupId);
-                        metadata.put("trace_ids", new ArrayList<String>());
-                        metadata.put("latest_create_time", createTime);
-                        metadata.put("total_likes", 0);
-                        metadata.put("total_dislikes", 0);
-                        metadata.put("has_rating", false);
-                        return metadata;
-                    });
-
-                    ((List<String>) groupsMetadataDict.get(groupId).get("trace_ids")).add(traceId);
-
-                    // Update latest_create_time if this trace is newer
-                    String currentLatest = (String) groupsMetadataDict.get(groupId).get("latest_create_time");
-                    if (createTime.compareTo(currentLatest) > 0) {
-                        groupsMetadataDict.get(groupId).put("latest_create_time", createTime);
-                    }
-                } catch (Exception e) {
-                    log.warn("Error processing trace hit", e);
-                    continue;
-                }
-            }
-
-            List<Map<String, Object>> groupsMetadata = new ArrayList<>(groupsMetadataDict.values());
-            log.debug("Built metadata for " + groupsMetadata.size() + " groups");
-
-            List<String> allTraceIds = new ArrayList<>();
-            for (Map<String, Object> metadata : groupsMetadata) {
-                allTraceIds.addAll((List<String>) metadata.get("trace_ids"));
-            }
-
-            if (allTraceIds.isEmpty()) {
-                log.warn("No trace_ids found, returning empty result");
-                Map<String, Object> data = new HashMap<>();
-                data.put("conversation_groups", new ArrayList<>());
-                data.put("total", 0);
-                data.put("page", page);
-                data.put("page_size", pageSize);
-                data.put("total_pages", 0);
-
-                sendJsonResponse(response, HttpServletResponse.SC_OK,
-                        WebResponse.success(data).toMap());
-            }
-
-            log.debug("Loading ratings for " + allTraceIds.size() + " traces");
-            Map<String, RatingStats> ratingsMap = EvaluationManager.getInstance().getRatingsForTraces(allTraceIds);
-
-            // Calculate rating stats per group
-            for (Map<String, Object> metadata : groupsMetadata) {
-                int totalLikes = 0;
-                int totalDislikes = 0;
-                boolean hasRating = false;
-
-                for (String traceId : (List<String>) metadata.get("trace_ids")) {
-                    RatingStats ratingStats = ratingsMap.get(traceId);
-                    if (ratingStats != null) {
-                        totalLikes += ratingStats.getLikeCount();
-                        totalDislikes += ratingStats.getDislikeCount();
-                        if (ratingStats.getTotalRatings() > 0) {
-                            hasRating = true;
-                        }
-                    }
-                }
-
-                metadata.put("total_likes", totalLikes);
-                metadata.put("total_dislikes", totalDislikes);
-                metadata.put("has_rating", hasRating);
-            }
-
-            // Filter by rating criteria
-            List<Map<String, Object>> filteredGroupsMetadata = new ArrayList<>();
-            for (Map<String, Object> metadata : groupsMetadata) {
-                int totalLikes = (int) metadata.get("total_likes");
-                int totalDislikes = (int) metadata.get("total_dislikes");
-                boolean hasRating = (boolean) metadata.get("has_rating");
-
-                if (ratingFilter.equals("all") ||
-                        (ratingFilter.equals("liked") && totalLikes > 0) ||
-                        (ratingFilter.equals("disliked") && totalDislikes > 0) ||
-                        (ratingFilter.equals("unrated") && !hasRating)) {
-                    filteredGroupsMetadata.add(metadata);
-                }
-            }
-
-            // Sort by latest time
-            filteredGroupsMetadata.sort((a, b) -> {
-                String timeA = (String) a.get("latest_create_time");
-                String timeB = (String) b.get("latest_create_time");
-                return timeB.compareTo(timeA);
-            });
-
-            // Pagination
-            int totalGroups = filteredGroupsMetadata.size();
-            int fromIndex = (page - 1) * pageSize;
-            int toIndex = Math.min(fromIndex + pageSize, totalGroups);
-
-            List<Map<String, Object>> pageGroupsMetadata;
-            if (fromIndex >= totalGroups) {
-                pageGroupsMetadata = new ArrayList<>();
-            } else {
-                pageGroupsMetadata = filteredGroupsMetadata.subList(fromIndex, toIndex);
-            }
-
-            // Fetch full details only for current page
-            List<String> pageTraceIds = new ArrayList<>();
-            for (Map<String, Object> metadata : pageGroupsMetadata) {
-                pageTraceIds.addAll((List<String>) metadata.get("trace_ids"));
-            }
-
-            // Fetch full trace details
-            Map<String, Object> pageTracesSearchParams = new HashMap<>();
-            Map<String, Object> termsQuery = new HashMap<>();
-            termsQuery.put("trace_id", pageTraceIds);
-            Map<String, Object> innerQuery = new HashMap<>();
-            innerQuery.put("terms", termsQuery);
-            pageTracesSearchParams.put("query", innerQuery);
-            pageTracesSearchParams.put("size", pageTraceIds.size());
-            pageTracesSearchParams.put("_source", Arrays.asList(
-                    "trace_id", "input", "callee", "output", "create_time", "from_trace_id", "group_id"
-            ));
-
-            Map<String, Object> pageTracesResponse = mas.getEsClient().search(Config.getAppName() + "_trace", pageTracesSearchParams);
-
-            // Build trace details map
-            Map<String, Map<String, Object>> traceDetailsMap = new HashMap<>();
-            Map<String, Object> pageHits = (Map<String, Object>) pageTracesResponse.getOrDefault("hits", Map.of());
-            List<Map<String, Object>> pageTraceHits = (List<Map<String, Object>>) pageHits.getOrDefault("hits", List.of());
-
-            for (Map<String, Object> hit : pageTraceHits) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> source = (Map<String, Object>) hit.getOrDefault("_source", Map.of());
-                String traceId = (String) source.getOrDefault("trace_id", "");
-                traceDetailsMap.put(traceId, source);
-            }
-
-            Map<String, List<ConversationRating>> ratingHistoriesMap = EvaluationManager.getInstance().getRatingHistoriesForTraces(pageTraceIds);
-
-            // Build response
-            List<Map<String, Object>> conversationGroups = new ArrayList<>();
-
-            for (Map<String, Object> metadata : pageGroupsMetadata) {
-                String groupId = (String) metadata.get("group_id");
-                List<Map<String, Object>> conversations = new ArrayList<>();
-
-                for (String traceId : (List<String>) metadata.get("trace_ids")) {
-                    Map<String, Object> traceDetail = traceDetailsMap.get(traceId);
-                    if (traceDetail == null) {
-                        continue;
-                    }
-
-                    Map<String, Object> conversationData = new HashMap<>();
-                    conversationData.put("trace_id", traceId);
-                    conversationData.put("input", traceDetail.getOrDefault("input", ""));
-                    conversationData.put("callee", traceDetail.getOrDefault("callee", ""));
-                    conversationData.put("output", traceDetail.getOrDefault("output", ""));
-                    conversationData.put("create_time", traceDetail.getOrDefault("create_time", ""));
-                    conversationData.put("from_trace_id", traceDetail.getOrDefault("from_trace_id", ""));
-                    conversationData.put("group_id", groupId);
-
-                    RatingStats ratingStats = ratingsMap.get(traceId);
-                    List<ConversationRating> ratingHistory = ratingHistoriesMap.getOrDefault(traceId, new ArrayList<>());
-
-                    ConversationWithRating conversationWithRating = new ConversationWithRating(
-                            traceId,
-                            (String) conversationData.get("input"),
-                            (String) conversationData.get("callee"),
-                            (String) conversationData.get("output"),
-                            (String) conversationData.get("create_time"),
-                            (String) conversationData.get("from_trace_id"),
-                            ratingStats,
-                            ratingHistory
-                    );
-
-                    conversations.add(conversationWithRating.toMap());
-                }
-
-                // Sort conversations by create_time
-                conversations.sort((a, b) -> {
-                    String timeA = (String) a.get("create_time");
-                    String timeB = (String) b.get("create_time");
-                    return timeA.compareTo(timeB);
-                });
-
-                Map<String, Object> groupData = new HashMap<>();
-                groupData.put("group_id", groupId);
-                groupData.put("conversations", conversations);
-                groupData.put("latest_create_time", metadata.get("latest_create_time"));
-                groupData.put("conversation_count", conversations.size());
-                groupData.put("total_likes", metadata.get("total_likes"));
-                groupData.put("total_dislikes", metadata.get("total_dislikes"));
-                groupData.put("has_rating", metadata.get("has_rating"));
-
-                conversationGroups.add(groupData);
-            }
-
-            Map<String, Object> responseData = new HashMap<>();
-            responseData.put("conversation_groups", conversationGroups);
-            responseData.put("total", totalGroups);
-            responseData.put("page", page);
-            responseData.put("page_size", pageSize);
-            responseData.put("total_pages", (totalGroups + pageSize - 1) / pageSize);
-
-            sendJsonResponse(response, HttpServletResponse.SC_OK,
-                    WebResponse.success(responseData).toMap());
+            Map<String, Object> responseData = EvaluationManager.getInstance().historyWithRatings(ratingFilter, searchTerm, page, pageSize);
+            sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(responseData).toMap());
         } catch (Exception e) {
             log.error("Get history with ratings failed", e);
             sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,

@@ -78,7 +78,7 @@ public class PromptManager {
 
             if (existing != null) {
                 // For updates, always increment based on current version in ES
-                int currentVersion = ((Long) existing.getOrDefault("version", 1)).intValue();
+                int currentVersion = existing.getOrDefault("version", 1) instanceof Long ? ((Long) existing.getOrDefault("version", 1)).intValue() : (Integer) existing.getOrDefault("version", 1);
                 doc.put("version", currentVersion + 1);
 
                 // Verify cache hasn't drifted from ES
@@ -86,7 +86,7 @@ public class PromptManager {
                 try {
                     Map<String, Object> cachedPrompt = promptCache.get(promptKey);
                     if (cachedPrompt != null) {
-                        int cachedVersion = ((Long) cachedPrompt.getOrDefault("version", 0)).intValue();
+                        int cachedVersion = cachedPrompt.getOrDefault("version", 0) instanceof Long ? ((Long) cachedPrompt.getOrDefault("version", 0)).intValue() : (Integer) cachedPrompt.getOrDefault("version", 0);
                         if (cachedVersion != currentVersion) {
                             log.warn("Cache version mismatch for {}: cache={}, ES={}. Syncing cache...",
                                     promptKey, cachedVersion, currentVersion);
@@ -184,13 +184,12 @@ public class PromptManager {
             }
 
             // Cache miss, fetch from database
-            Map<String, Object> searchBody = new HashMap<>();
-            Map<String, Object> query = new HashMap<>();
-            Map<String, Object> term = new HashMap<>();
-            term.put("_id", promptKey);
-            query.put("term", term);
-            searchBody.put("query", query);
-            searchBody.put("size", 1);
+            Map<String, Object> term = Map.of("_id", promptKey);
+            Map<String, Object> query = Map.of("term", term);
+            Map<String, Object> searchBody = Map.of(
+                    "query", query,
+                    "size", 1
+            );
 
             try {
                 Map<String, Object> response = esClient.search(indexName, searchBody);
@@ -265,36 +264,29 @@ public class PromptManager {
     public List<Map<String, Object>> getPromptHistory(String promptKey) {
         try {
             // Search history records
-            Map<String, Object> query = new HashMap<>();
-            Map<String, Object> bool = new HashMap<>();
             List<Map<String, Object>> must = new ArrayList<>();
 
-            Map<String, Object> promptKeyTerm = new HashMap<>();
-            promptKeyTerm.put("prompt_key", promptKey);
-            Map<String, Object> term1 = new HashMap<>();
-            term1.put("term", promptKeyTerm);
+            Map<String, Object> promptKeyTerm = Map.of("prompt_key", promptKey);
+            Map<String, Object> term1 = Map.of("term", promptKeyTerm);
             must.add(term1);
 
-            Map<String, Object> isHistoryTerm = new HashMap<>();
-            isHistoryTerm.put("is_history", true);
-            Map<String, Object> term2 = new HashMap<>();
-            term2.put("term", isHistoryTerm);
+            Map<String, Object> isHistoryTerm = Map.of("is_history", true);
+            Map<String, Object> term2 = Map.of("term", isHistoryTerm);
             must.add(term2);
 
-            bool.put("must", must);
-            query.put("bool", bool);
+            Map<String, Object> bool = Map.of("must", must);
+            Map<String, Object> query = Map.of("bool", bool);
 
-            Map<String, Object> sort = new HashMap<>();
-            sort.put("order", "desc");
-            Map<String, Object> versionSort = new HashMap<>();
-            versionSort.put("version", sort);
+            Map<String, Object> sort = Map.of("order", "desc");
+            Map<String, Object> versionSort = Map.of("version", sort);
             List<Map<String, Object>> sorts = new ArrayList<>();
             sorts.add(versionSort);
 
-            Map<String, Object> searchBody = new HashMap<>();
-            searchBody.put("query", query);
-            searchBody.put("sort", sorts);
-            searchBody.put("size", 50);
+            Map<String, Object> searchBody = Map.of(
+                    "query", query,
+                    "sort", sorts,
+                    "size", 50
+            );
 
             Map<String, Object> response = esClient.search(indexName + "_history", searchBody);
             List<Map<String, Object>> histories = new ArrayList<>();
@@ -312,25 +304,22 @@ public class PromptManager {
 
             // If term query yields nothing and we're on ES, try match fallback
             if (histories.isEmpty() && !(esClient instanceof LocalEs)) {
-                Map<String, Object> queryFallback = new HashMap<>();
-                Map<String, Object> boolFallback = new HashMap<>();
                 List<Map<String, Object>> mustFallback = new ArrayList<>();
 
-                Map<String, Object> promptKeyMatch = new HashMap<>();
-                promptKeyMatch.put("prompt_key", promptKey);
-                Map<String, Object> match = new HashMap<>();
-                match.put("match", promptKeyMatch);
+                Map<String, Object> promptKeyMatch = Map.of("prompt_key", promptKey);
+                Map<String, Object> match = Map.of("match", promptKeyMatch);
                 mustFallback.add(match);
 
                 mustFallback.add(term2); // Same is_history term as before
 
-                boolFallback.put("must", mustFallback);
-                queryFallback.put("bool", boolFallback);
+                Map<String, Object> boolFallback = Map.of("must", mustFallback);
+                Map<String, Object> queryFallback = Map.of("bool", boolFallback);
 
-                Map<String, Object> searchBodyFallback = new HashMap<>();
-                searchBodyFallback.put("query", queryFallback);
-                searchBodyFallback.put("sort", sorts);
-                searchBodyFallback.put("size", 50);
+                Map<String, Object> searchBodyFallback = Map.of(
+                        "query", queryFallback,
+                        "sort", sorts,
+                        "size", 50
+                );
 
                 Map<String, Object> responseFallback = esClient.search(indexName + "_history", searchBodyFallback);
 
@@ -361,13 +350,12 @@ public class PromptManager {
 
             try {
                 // Use search instead of get method
-                Map<String, Object> searchBody = new HashMap<>();
-                Map<String, Object> query = new HashMap<>();
-                Map<String, Object> term = new HashMap<>();
-                term.put("_id", historyId);
-                query.put("term", term);
-                searchBody.put("query", query);
-                searchBody.put("size", 1);
+                Map<String, Object> term = Map.of("_id", historyId);
+                Map<String, Object> query = Map.of("term", term);
+                Map<String, Object> searchBody = Map.of(
+                        "query", query,
+                        "size", 1
+                );
 
                 Map<String, Object> response = esClient.search(indexName + "_history", searchBody);
 
@@ -460,63 +448,53 @@ public class PromptManager {
             }
 
             // Build query for ES search
-            Map<String, Object> query = new HashMap<>();
-            query.put("match_all", Map.of());
+            Map<String, Object> query = Map.of("match_all", Map.of());
             List<Map<String, Object>> filters = new ArrayList<>();
 
             if (category != null) {
-                Map<String, Object> categoryTerm = new HashMap<>();
-                categoryTerm.put("category", category);
-                Map<String, Object> categoryFilter = new HashMap<>();
-                categoryFilter.put("term", categoryTerm);
+                Map<String, Object> categoryTerm = Map.of("category", category);
+                Map<String, Object> categoryFilter = Map.of("term", categoryTerm);
                 filters.add(categoryFilter);
             }
             if (agentType != null) {
-                Map<String, Object> agentTypeTerm = new HashMap<>();
-                agentTypeTerm.put("agent_type", agentType);
-                Map<String, Object> agentTypeFilter = new HashMap<>();
-                agentTypeFilter.put("term", agentTypeTerm);
+                Map<String, Object> agentTypeTerm = Map.of("agent_type", agentType);
+                Map<String, Object> agentTypeFilter = Map.of("term", agentTypeTerm);
                 filters.add(agentTypeFilter);
             }
             if (isActive != null) {
-                Map<String, Object> isActiveTerm = new HashMap<>();
-                isActiveTerm.put("is_active", isActive);
-                Map<String, Object> isActiveFilter = new HashMap<>();
-                isActiveFilter.put("term", isActiveTerm);
+                Map<String, Object> isActiveTerm = Map.of("is_active", isActive);
+                Map<String, Object> isActiveFilter = Map.of("term", isActiveTerm);
                 filters.add(isActiveFilter);
             }
             if (tags != null) {
                 for (String tag : tags) {
-                    Map<String, Object> tagTerm = new HashMap<>();
-                    tagTerm.put("tags", tag);
-                    Map<String, Object> tagFilter = new HashMap<>();
-                    tagFilter.put("term", tagTerm);
+                    Map<String, Object> tagTerm = Map.of("tags", tag);
+                    Map<String, Object> tagFilter = Map.of("term", tagTerm);
                     filters.add(tagFilter);
                 }
             }
 
             if (!filters.isEmpty()) {
-                Map<String, Object> boolQuery = new HashMap<>();
                 List<Map<String, Object>> must = new ArrayList<>();
                 must.add(Map.of("match_all", Map.of()));
-                boolQuery.put("must", must);
-                boolQuery.put("filter", filters);
+                Map<String, Object> boolQuery = Map.of(
+                        "must", must,
+                        "filter", filters
+                );
                 query = Map.of("bool", boolQuery);
             }
 
             // Run search
-            Map<String, Object> searchBody = new HashMap<>();
-            searchBody.put("query", query);
-
-            Map<String, Object> sort = new HashMap<>();
-            sort.put("order", "desc");
-            Map<String, Object> updatedAtSort = new HashMap<>();
-            updatedAtSort.put("updated_at", sort);
+            Map<String, Object> sort = Map.of("order", "desc");
+            Map<String, Object> updatedAtSort = Map.of("updated_at", sort);
             List<Map<String, Object>> sorts = new ArrayList<>();
             sorts.add(updatedAtSort);
 
-            searchBody.put("sort", sorts);
-            searchBody.put("size", 1000);
+            Map<String, Object> searchBody = Map.of(
+                    "query", query,
+                    "sort", sorts,
+                    "size", 1000
+            );
 
             Map<String, Object> response = esClient.search(indexName, searchBody);
 
@@ -584,53 +562,50 @@ public class PromptManager {
     public List<Map<String, Object>> searchPrompts(String keyword, String category) {
         try {
             // Build search query
-            Map<String, Object> multiMatch = new HashMap<>();
-            multiMatch.put("query", keyword);
             List<String> fields = Arrays.asList("prompt_key^2", "description^1.5", "prompt_content", "tags^1.2");
-            multiMatch.put("fields", fields);
-            multiMatch.put("type", "best_fields");
+            Map<String, Object> multiMatch = Map.of(
+                    "query", keyword,
+                    "fields", fields,
+                    "type", "best_fields"
+            );
 
-            Map<String, Object> multiMatchQuery = new HashMap<>();
-            multiMatchQuery.put("multi_match", multiMatch);
+            Map<String, Object> multiMatchQuery = Map.of("multi_match", multiMatch);
 
             List<Map<String, Object>> mustQueries = new ArrayList<>();
             mustQueries.add(multiMatchQuery);
 
             List<Map<String, Object>> filters = new ArrayList<>();
             if (category != null) {
-                Map<String, Object> categoryTerm = new HashMap<>();
-                categoryTerm.put("category", category);
-                Map<String, Object> categoryFilter = new HashMap<>();
-                categoryFilter.put("term", categoryTerm);
+                Map<String, Object> categoryTerm = Map.of("category", category);
+                Map<String, Object> categoryFilter = Map.of("term", categoryTerm);
                 filters.add(categoryFilter);
             }
 
-            Map<String, Object> bool = new HashMap<>();
-            bool.put("must", mustQueries);
-            bool.put("filter", filters);
+            Map<String, Object> bool = Map.of(
+                    "must", mustQueries,
+                    "filter", filters
+            );
             Map<String, Object> query = Map.of("bool", bool);
 
             // Execute search
-            Map<String, Object> highlight = new HashMap<>();
-            Map<String, Object> descriptionHighlight = new HashMap<>();
-            highlight.put("description", descriptionHighlight);
+            Map<String, Object> descriptionHighlight = Map.of();
+            Map<String, Object> promptContentHighlight = Map.of("fragment_size", 150);
+            Map<String, Object> highlight = Map.of(
+                    "description", descriptionHighlight,
+                    "prompt_content", promptContentHighlight
+            );
 
-            Map<String, Object> promptContentHighlight = new HashMap<>();
-            promptContentHighlight.put("fragment_size", 150);
-            highlight.put("prompt_content", promptContentHighlight);
-
-            Map<String, Object> sort = new HashMap<>();
-            sort.put("order", "desc");
-            Map<String, Object> scoreSort = new HashMap<>();
-            scoreSort.put("_score", sort);
+            Map<String, Object> sort = Map.of("order", "desc");
+            Map<String, Object> scoreSort = Map.of("_score", sort);
             List<Map<String, Object>> sorts = new ArrayList<>();
             sorts.add(scoreSort);
 
-            Map<String, Object> searchBody = new HashMap<>();
-            searchBody.put("query", query);
-            searchBody.put("highlight", highlight);
-            searchBody.put("sort", sorts);
-            searchBody.put("size", 50);
+            Map<String, Object> searchBody = Map.of(
+                    "query", query,
+                    "highlight", highlight,
+                    "sort", sorts,
+                    "size", 50
+            );
 
             Map<String, Object> response = esClient.search(indexName, searchBody);
 

@@ -3,18 +3,22 @@ package com.jd.oxygent.core;
 import com.jd.oxygent.core.oxygent.infra.databases.BaseEs;
 import com.jd.oxygent.core.oxygent.infra.impl.databases.es.LocalEs;
 import com.jd.oxygent.core.oxygent.samples.server.masprovider.factory.impl.platform.spring.ApplicationContextHolder;
+import com.jd.oxygent.core.oxygent.samples.server.vo.WebResponse;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.ConversationRating;
+import com.jd.oxygent.core.oxygent.schemas.evaluation.ConversationWithRating;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingRequest;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingResponse;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingStats;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingType;
 import com.jd.oxygent.core.oxygent.utils.CommonUtils;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -108,7 +112,7 @@ public class EvaluationManager {
             );
             esClient.index(ratingIndex, ratingId, rating.toMap());
             refreshIndex(ratingIndex);
-            RatingStats stats = updateRatingStats(ratingRequest.getTraceId(), Optional.ofNullable(ratingRequest.getRatingType()));
+            RatingStats stats = updateRatingStats(ratingRequest.getTraceId(), ratingRequest.getRatingType());
             return new RatingResponse(true, ratingId, stats, "Rating successful");
         } catch (Exception e) {
             log.error("Failed to create/update rating: " + e.getMessage(), e);
@@ -120,13 +124,12 @@ public class EvaluationManager {
         try {
             String traceIndex = appName + "_trace";
 
-            Map<String, Object> query = new HashMap<>();
-            Map<String, Object> termQuery = new HashMap<>();
-            termQuery.put("trace_id", traceId);
-            Map<String, Object> innerQuery = new HashMap<>();
-            innerQuery.put("term", termQuery);
-            query.put("query", innerQuery);
-            query.put("size", 1);
+            Map<String, Object> query = Map.of(
+                "query", Map.of(
+                    "term", Map.of("trace_id", traceId)
+                ),
+                "size", 1
+            );
 
             Map<String, Object> response = esClient.search(traceIndex, query);
 
@@ -143,19 +146,18 @@ public class EvaluationManager {
         }
     }
 
-    public RatingStats updateRatingStats(String traceId, Optional<RatingType> knownRatingType) {
+    public RatingStats updateRatingStats(String traceId, RatingType knownRatingType) {
         try {
             int likeCount = 0;
             int dislikeCount = 0;
             int totalRatings = 0;
 
-            Map<String, Object> query = new HashMap<>();
-            Map<String, Object> termQuery = new HashMap<>();
-            termQuery.put("trace_id", traceId);
-            Map<String, Object> innerQuery = new HashMap<>();
-            innerQuery.put("term", termQuery);
-            query.put("query", innerQuery);
-            query.put("size", 1000);
+            Map<String, Object> query = Map.of(
+                "query", Map.of(
+                    "term", Map.of("trace_id", traceId)
+                ),
+                "size", 1000
+            );
 
             Map<String, Object> response = esClient.search(ratingIndex, query);
 
@@ -201,13 +203,12 @@ public class EvaluationManager {
 
     public Optional<RatingStats> getRatingStats(String traceId) {
         try {
-            Map<String, Object> query = new HashMap<>();
-            Map<String, Object> termQuery = new HashMap<>();
-            termQuery.put("trace_id", traceId);
-            Map<String, Object> innerQuery = new HashMap<>();
-            innerQuery.put("term", termQuery);
-            query.put("query", innerQuery);
-            query.put("size", 1);
+            Map<String, Object> query = Map.of(
+                "query", Map.of(
+                    "term", Map.of("trace_id", traceId)
+                ),
+                "size", 1
+            );
 
             Map<String, Object> response = esClient.search(ratingStatsIndex, query);
 
@@ -236,13 +237,12 @@ public class EvaluationManager {
                 return Map.of();
             }
 
-            Map<String, Object> query = new HashMap<>();
-            Map<String, Object> termsQuery = new HashMap<>();
-            termsQuery.put("trace_id", traceIds);
-            Map<String, Object> innerQuery = new HashMap<>();
-            innerQuery.put("terms", termsQuery);
-            query.put("query", innerQuery);
-            query.put("size", 10000);
+            Map<String, Object> query = Map.of(
+                "query", Map.of(
+                    "terms", Map.of("trace_id", traceIds)
+                ),
+                "size", 10000
+            );
 
             Map<String, Object> response = esClient.search(ratingStatsIndex, query);
 
@@ -270,29 +270,31 @@ public class EvaluationManager {
 
     public List<ConversationRating> getRatingHistory(String traceId, Optional<String> erp) {
         try {
-            Map<String, Object> query = new HashMap<>();
-            Map<String, Object> boolQuery = new HashMap<>();
-            List<Map<String, Object>> mustClauses = new ArrayList<>();
-
-            Map<String, Object> traceIdTerm = new HashMap<>();
-            traceIdTerm.put("trace_id", traceId);
-            Map<String, Object> traceIdQuery = new HashMap<>();
-            traceIdQuery.put("term", traceIdTerm);
-            mustClauses.add(traceIdQuery);
-
+            Map<String, Object> query;
             if (erp.isPresent()) {
-                Map<String, Object> erpTerm = new HashMap<>();
-                erpTerm.put("erp", erp.get());
-                Map<String, Object> erpQuery = new HashMap<>();
-                erpQuery.put("term", erpTerm);
-                mustClauses.add(erpQuery);
+                query = Map.of(
+                    "query", Map.of(
+                        "bool", Map.of(
+                            "must", List.of(
+                                Map.of("term", Map.of("trace_id", traceId)),
+                                Map.of("term", Map.of("erp", erp.get()))
+                            )
+                        )
+                    ),
+                    "size", 1000
+                );
+            } else {
+                query = Map.of(
+                    "query", Map.of(
+                        "bool", Map.of(
+                            "must", List.of(
+                                Map.of("term", Map.of("trace_id", traceId))
+                            )
+                        )
+                    ),
+                    "size", 1000
+                );
             }
-
-            boolQuery.put("must", mustClauses);
-            Map<String, Object> innerQuery = new HashMap<>();
-            innerQuery.put("bool", boolQuery);
-            query.put("query", innerQuery);
-            query.put("size", 1000);
 
             Map<String, Object> response = esClient.search(ratingIndex, query);
 
@@ -364,20 +366,22 @@ public class EvaluationManager {
 
     public boolean deleteRating(String ratingId) {
         try {
-            Map<String, Object> query = new HashMap<>();
-            Map<String, Object> termQuery = new HashMap<>();
-            termQuery.put("rating_id", ratingId);
-            Map<String, Object> innerQuery = new HashMap<>();
-            innerQuery.put("term", termQuery);
-            query.put("query", innerQuery);
-            query.put("size", 1);
+            Map<String, Object> query = Map.of(
+                "query", Map.of(
+                    "term", Map.of("rating_id", ratingId)
+                ),
+                "size", 1
+            );
 
             Map<String, Object> response = esClient.search(ratingIndex, query);
 
             if (response == null || getHitsTotal(response) == 0) {
-                termQuery.put("trace_id", ratingId);
-                innerQuery.put("term", termQuery);
-                query.put("query", innerQuery);
+                query = Map.of(
+                    "query", Map.of(
+                        "term", Map.of("trace_id", ratingId)
+                    ),
+                    "size", 1
+                );
 
                 response = esClient.search(ratingIndex, query);
             }
@@ -394,7 +398,7 @@ public class EvaluationManager {
 
             esClient.delete(ratingIndex, docId);
 
-            updateRatingStats(traceId, Optional.empty());
+            updateRatingStats(traceId, null);
 
             log.info("Deleted rating for trace " + traceId);
             return true;
@@ -404,6 +408,268 @@ public class EvaluationManager {
         }
     }
 
+    public Map<String, Object> historyWithRatings(String ratingFilter, String searchTerm, int page, int pageSize) {
+
+        // Build search query
+        Map<String, Object> searchQuery = Map.of("match_all", Map.of());
+
+        if (searchTerm != null && !searchTerm.strip().isEmpty()) {
+            Map<String, Object> boolQuery = new HashMap<>();
+            List<Map<String, Object>> shouldClauses = new ArrayList<>();
+
+            Map<String, Object> termTraceId = Map.of("term", Map.of("trace_id", searchTerm));
+            shouldClauses.add(termTraceId);
+
+            Map<String, Object> matchInput = Map.of("match", Map.of("input", searchTerm));
+            shouldClauses.add(matchInput);
+
+            Map<String, Object> matchCallee = Map.of("match", Map.of("callee", searchTerm));
+            shouldClauses.add(matchCallee);
+
+            Map<String, Object> matchOutput = Map.of("match", Map.of("output", searchTerm));
+            shouldClauses.add(matchOutput);
+
+            boolQuery.put("should", shouldClauses);
+            boolQuery.put("minimum_should_match", 1);
+            searchQuery = Map.of("bool", boolQuery);
+        }
+
+        // Calculate how many traces we need to fetch
+        int fetchSize = pageSize * 10;
+
+        log.info(String.format("Fetching history: page=%d, page_size=%d, fetch_size=%d, rating_filter=%s, search_term=%s",
+                page, pageSize, fetchSize, ratingFilter, searchTerm));
+
+        Map<String, Object> searchBody = Map.of(
+                "query", searchQuery,
+                "size", fetchSize,
+                "_source", List.of("trace_id", "group_id", "create_time"),
+                "sort", List.of(Map.of("create_time", Map.of("order", "desc")))
+        );
+
+        Map<String, Object> tracesResponse = esClient.search(Config.getAppName() + "_trace", searchBody);
+
+        // Fetch traces with minimal fields for grouping
+        // This is a placeholder and needs to be replaced with actual ES search implementation
+        List<Map<String, Object>> traceHits = (List<Map<String, Object>>) ((Map<String, Object>) tracesResponse.get("hits")).get("hits");
+        log.debug("Retrieved " + traceHits.size() + " traces from database");
+        // Group traces by group_id
+        Map<String, Map<String, Object>> groupsMetadataDict = new HashMap<>();
+
+        for (Map<String, Object> hit : traceHits) {
+            try {
+                Map<String, Object> source = (Map<String, Object>) hit.get("_source");
+                String traceId = (String) source.get("trace_id");
+                String groupId = (String) source.getOrDefault("group_id", traceId);
+                String createTime = (String) source.get("create_time");
+
+                if (traceId == null || traceId.isEmpty()) {
+                    continue;
+                }
+
+                groupsMetadataDict.computeIfAbsent(groupId, k -> {
+                    Map<String, Object> metadata = new HashMap<>();
+                    metadata.put("group_id", groupId);
+                    metadata.put("trace_ids", new ArrayList<String>());
+                    metadata.put("latest_create_time", createTime);
+                    metadata.put("total_likes", 0);
+                    metadata.put("total_dislikes", 0);
+                    metadata.put("has_rating", false);
+                    return metadata;
+                });
+
+                ((List<String>) groupsMetadataDict.get(groupId).get("trace_ids")).add(traceId);
+
+                // Update latest_create_time if this trace is newer
+                String currentLatest = (String) groupsMetadataDict.get(groupId).get("latest_create_time");
+                if (createTime.compareTo(currentLatest) > 0) {
+                    groupsMetadataDict.get(groupId).put("latest_create_time", createTime);
+                }
+            } catch (Exception e) {
+                log.warn("Error processing trace hit", e);
+                continue;
+            }
+        }
+
+        List<Map<String, Object>> groupsMetadata = new ArrayList<>(groupsMetadataDict.values());
+        log.debug("Built metadata for " + groupsMetadata.size() + " groups");
+
+        List<String> allTraceIds = new ArrayList<>();
+        for (Map<String, Object> metadata : groupsMetadata) {
+            allTraceIds.addAll((List<String>) metadata.get("trace_ids"));
+        }
+
+        if (allTraceIds.isEmpty()) {
+            log.warn("No trace_ids found, returning empty result");
+            Map<String, Object> data = new HashMap<>();
+            data.put("conversation_groups", new ArrayList<>());
+            data.put("total", 0);
+            data.put("page", page);
+            data.put("page_size", pageSize);
+            data.put("total_pages", 0);
+            return data;
+        }
+
+        log.debug("Loading ratings for " + allTraceIds.size() + " traces");
+        Map<String, RatingStats> ratingsMap = EvaluationManager.getInstance().getRatingsForTraces(allTraceIds);
+
+        // Calculate rating stats per group
+        for (Map<String, Object> metadata : groupsMetadata) {
+            int totalLikes = 0;
+            int totalDislikes = 0;
+            boolean hasRating = false;
+
+            for (String traceId : (List<String>) metadata.get("trace_ids")) {
+                RatingStats ratingStats = ratingsMap.get(traceId);
+                if (ratingStats != null) {
+                    totalLikes += ratingStats.getLikeCount();
+                    totalDislikes += ratingStats.getDislikeCount();
+                    if (ratingStats.getTotalRatings() > 0) {
+                        hasRating = true;
+                    }
+                }
+            }
+
+            metadata.put("total_likes", totalLikes);
+            metadata.put("total_dislikes", totalDislikes);
+            metadata.put("has_rating", hasRating);
+        }
+
+        // Filter by rating criteria
+        List<Map<String, Object>> filteredGroupsMetadata = new ArrayList<>();
+        for (Map<String, Object> metadata : groupsMetadata) {
+            int totalLikes = (int) metadata.get("total_likes");
+            int totalDislikes = (int) metadata.get("total_dislikes");
+            boolean hasRating = (boolean) metadata.get("has_rating");
+
+            if (ratingFilter.equals("all") ||
+                    (ratingFilter.equals("liked") && totalLikes > 0) ||
+                    (ratingFilter.equals("disliked") && totalDislikes > 0) ||
+                    (ratingFilter.equals("unrated") && !hasRating)) {
+                filteredGroupsMetadata.add(metadata);
+            }
+        }
+
+        // Sort by latest time
+        filteredGroupsMetadata.sort((a, b) -> {
+            String timeA = (String) a.get("latest_create_time");
+            String timeB = (String) b.get("latest_create_time");
+            return timeB.compareTo(timeA);
+        });
+
+        // Pagination
+        int totalGroups = filteredGroupsMetadata.size();
+        int fromIndex = (page - 1) * pageSize;
+        int toIndex = Math.min(fromIndex + pageSize, totalGroups);
+
+        List<Map<String, Object>> pageGroupsMetadata;
+        if (fromIndex >= totalGroups) {
+            pageGroupsMetadata = new ArrayList<>();
+        } else {
+            pageGroupsMetadata = filteredGroupsMetadata.subList(fromIndex, toIndex);
+        }
+
+        // Fetch full details only for current page
+        List<String> pageTraceIds = new ArrayList<>();
+        for (Map<String, Object> metadata : pageGroupsMetadata) {
+            pageTraceIds.addAll((List<String>) metadata.get("trace_ids"));
+        }
+
+        // Fetch full trace details
+        Map<String, Object> pageTracesSearchParams = new HashMap<>();
+        Map<String, Object> termsQuery = new HashMap<>();
+        termsQuery.put("trace_id", pageTraceIds);
+        Map<String, Object> innerQuery = new HashMap<>();
+        innerQuery.put("terms", termsQuery);
+        pageTracesSearchParams.put("query", innerQuery);
+        pageTracesSearchParams.put("size", pageTraceIds.size());
+        pageTracesSearchParams.put("_source", Arrays.asList(
+                "trace_id", "input", "callee", "output", "create_time", "from_trace_id", "group_id"
+        ));
+
+        Map<String, Object> pageTracesResponse = esClient.search(Config.getAppName() + "_trace", pageTracesSearchParams);
+
+        // Build trace details map
+        Map<String, Map<String, Object>> traceDetailsMap = new HashMap<>();
+        Map<String, Object> pageHits = (Map<String, Object>) pageTracesResponse.getOrDefault("hits", Map.of());
+        List<Map<String, Object>> pageTraceHits = (List<Map<String, Object>>) pageHits.getOrDefault("hits", List.of());
+
+        for (Map<String, Object> hit : pageTraceHits) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> source = (Map<String, Object>) hit.getOrDefault("_source", Map.of());
+            String traceId = (String) source.getOrDefault("trace_id", "");
+            traceDetailsMap.put(traceId, source);
+        }
+
+        Map<String, List<ConversationRating>> ratingHistoriesMap = EvaluationManager.getInstance().getRatingHistoriesForTraces(pageTraceIds);
+
+        // Build response
+        List<Map<String, Object>> conversationGroups = new ArrayList<>();
+
+        for (Map<String, Object> metadata : pageGroupsMetadata) {
+            String groupId = (String) metadata.get("group_id");
+            List<Map<String, Object>> conversations = new ArrayList<>();
+
+            for (String traceId : (List<String>) metadata.get("trace_ids")) {
+                Map<String, Object> traceDetail = traceDetailsMap.get(traceId);
+                if (traceDetail == null) {
+                    continue;
+                }
+
+                Map<String, Object> conversationData = new HashMap<>();
+                conversationData.put("trace_id", traceId);
+                conversationData.put("input", traceDetail.getOrDefault("input", ""));
+                conversationData.put("callee", traceDetail.getOrDefault("callee", ""));
+                conversationData.put("output", traceDetail.getOrDefault("output", ""));
+                conversationData.put("create_time", traceDetail.getOrDefault("create_time", ""));
+                conversationData.put("from_trace_id", traceDetail.getOrDefault("from_trace_id", ""));
+                conversationData.put("group_id", groupId);
+
+                RatingStats ratingStats = ratingsMap.get(traceId);
+                List<ConversationRating> ratingHistory = ratingHistoriesMap.getOrDefault(traceId, new ArrayList<>());
+
+                ConversationWithRating conversationWithRating = new ConversationWithRating(
+                        traceId,
+                        (String) conversationData.get("input"),
+                        (String) conversationData.get("callee"),
+                        (String) conversationData.get("output"),
+                        (String) conversationData.get("create_time"),
+                        (String) conversationData.get("from_trace_id"),
+                        ratingStats,
+                        ratingHistory
+                );
+
+                conversations.add(conversationWithRating.toMap());
+            }
+
+            // Sort conversations by create_time
+            conversations.sort((a, b) -> {
+                String timeA = (String) a.get("create_time");
+                String timeB = (String) b.get("create_time");
+                return timeA.compareTo(timeB);
+            });
+
+            Map<String, Object> groupData = new HashMap<>();
+            groupData.put("group_id", groupId);
+            groupData.put("conversations", conversations);
+            groupData.put("latest_create_time", metadata.get("latest_create_time"));
+            groupData.put("conversation_count", conversations.size());
+            groupData.put("total_likes", metadata.get("total_likes"));
+            groupData.put("total_dislikes", metadata.get("total_dislikes"));
+            groupData.put("has_rating", metadata.get("has_rating"));
+
+            conversationGroups.add(groupData);
+        }
+
+        Map<String, Object> responseData = new HashMap<>();
+        responseData.put("conversation_groups", conversationGroups);
+        responseData.put("total", totalGroups);
+        responseData.put("page", page);
+        responseData.put("page_size", pageSize);
+        responseData.put("total_pages", (totalGroups + pageSize - 1) / pageSize);
+        return responseData;
+    }
+
     public Map<String, Object> getOverallRatingStats(int days) {
         try {
             LocalDateTime endDate = LocalDateTime.now();
@@ -411,16 +677,17 @@ public class EvaluationManager {
             String startDateStr = startDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd 00:00:00.000000"));
             String endDateStr = endDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd 23:59:59.999999"));
 
-            Map<String, Object> query = new HashMap<>();
-            Map<String, Object> rangeQuery = new HashMap<>();
-            Map<String, Object> createTimeRange = new HashMap<>();
-            createTimeRange.put("gte", startDateStr);
-            createTimeRange.put("lte", endDateStr);
-            rangeQuery.put("create_time", createTimeRange);
-            Map<String, Object> innerQuery = new HashMap<>();
-            innerQuery.put("range", rangeQuery);
-            query.put("query", innerQuery);
-            query.put("size", 10000);
+            Map<String, Object> query = Map.of(
+                "query", Map.of(
+                    "range", Map.of(
+                        "create_time", Map.of(
+                            "gte", startDateStr,
+                            "lte", endDateStr
+                        )
+                    )
+                ),
+                "size", 10000
+            );
 
             Map<String, Object> response = esClient.search(ratingIndex, query);
 
@@ -497,11 +764,12 @@ public class EvaluationManager {
             result.put("deleted_stats", 0);
             List<String> errors = new ArrayList<>();
 
-            Map<String, Object> query = new HashMap<>();
-            Map<String, Object> matchAll = new HashMap<>();
-            matchAll.put("match_all", new HashMap<>());
-            query.put("query", matchAll);
-            query.put("size", 1000);
+            Map<String, Object> query = Map.of(
+                "query", Map.of(
+                    "match_all", Map.of()
+                ),
+                "size", 1000
+            );
 
             Map<String, Object> ratingResponse = esClient.search(ratingIndex, query);
 
@@ -683,4 +951,5 @@ public class EvaluationManager {
             return result;
         }
     }
+
 }

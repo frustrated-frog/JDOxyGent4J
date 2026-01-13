@@ -19,7 +19,6 @@ import com.jd.oxygent.core.oxygent.samples.server.vo.ScriptRequest;
 import com.jd.oxygent.core.oxygent.samples.server.vo.WebResponse;
 import com.jd.oxygent.core.oxygent.schemas.SSEMessage;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.ConversationRating;
-import com.jd.oxygent.core.oxygent.schemas.evaluation.ConversationWithRating;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingRequest;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingResponse;
 import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingStats;
@@ -153,7 +152,7 @@ public class RouteController {
             log.error("Failed to get organization", e);
             return ResponseEntity
                     .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to get organization").toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to get organization").toMap());
         }
     }
 
@@ -173,7 +172,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Failed to get first query", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to get first query").toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to get first query").toMap());
         }
     }
 
@@ -191,7 +190,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Failed to get welcome message", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to get welcome message").toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to get welcome message").toMap());
         }
     }
 
@@ -222,7 +221,7 @@ public class RouteController {
         } catch (IOException e) {
             log.error("Failed to list scripts", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to list scripts").toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to list scripts").toMap());
         }
     }
 
@@ -248,7 +247,7 @@ public class RouteController {
         } catch (IOException e) {
             log.error("Failed to save script", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to save script").toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to save script").toMap());
         }
     }
 
@@ -266,7 +265,7 @@ public class RouteController {
 
             if (!Files.exists(jsonPath)) {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(WebResponse.error(500, "File not found").toMap());
+                        .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "File not found").toMap());
             }
 
             String content = Files.readString(jsonPath);
@@ -278,7 +277,7 @@ public class RouteController {
         } catch (IOException e) {
             log.error("Failed to load script", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to load script").toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to load script").toMap());
         }
     }
 
@@ -295,7 +294,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Failed to generate group_uid", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Internal server error requesting groupid").toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal server error requesting groupid").toMap());
         }
     }
 
@@ -311,7 +310,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Failed to generate trace_uid", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Internal server error requesting traceid").toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Internal server error requesting traceid").toMap());
         }
     }
 
@@ -396,7 +395,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Chat failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Chat failed: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Chat failed: " + e.getMessage()).toMap());
         }
     }
 
@@ -540,7 +539,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Async chat failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Async chat failed: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Async chat failed: " + e.getMessage()).toMap());
         }
     }
 
@@ -655,7 +654,7 @@ public class RouteController {
 
             if (nodeIds.isEmpty()) {
                 return ResponseEntity.badRequest()
-                        .body(WebResponse.error(400, "Invalid node ID").toMap());
+                        .body(WebResponse.error(HttpStatus.BAD_REQUEST.value(), "Invalid node ID").toMap());
             }
 
             if (traceId.equals(itemId)) {
@@ -729,12 +728,12 @@ public class RouteController {
             }
 
             return ResponseEntity.badRequest()
-                    .body(WebResponse.error(400, "Node not found").toMap());
+                    .body(WebResponse.error(HttpStatus.BAD_REQUEST.value(), "Node not found").toMap());
 
         } catch (Exception e) {
             log.error("Failed to get node info", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Encountered an issue").toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Encountered an issue").toMap());
         }
     }
 
@@ -806,7 +805,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Failed to get task info", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Encountered an issue").toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Encountered an issue").toMap());
         }
     }
 
@@ -905,7 +904,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Call failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Encountered an issue: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Encountered an issue: " + e.getMessage()).toMap());
         }
     }
 
@@ -939,7 +938,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("File upload failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "File upload failed: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "File upload failed: " + e.getMessage()).toMap());
         }
     }
 
@@ -992,7 +991,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Rating failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Rating failed: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Rating failed: " + e.getMessage()).toMap());
         }
     }
 
@@ -1002,15 +1001,16 @@ public class RouteController {
     @GetMapping("/history_with_ratings")
     public ResponseEntity<Map<String, Object>> historyWithRatings(
             @RequestParam(value = "page", defaultValue = "1") int page,
-            @RequestParam(value = "page_size", defaultValue = "20") int pageSize) {
+            @RequestParam(value = "page_size", defaultValue = "20") int pageSize,
+            @RequestParam(value = "rating_filter", defaultValue = "all") String ratingFilter,
+            @RequestParam(value = "search_term", defaultValue = "") String searchTerm) {
         try {
-            // 由于EvaluationManager没有直接提供该方法，我们返回空列表
-            List<ConversationWithRating> conversations = new ArrayList<>();
+            Map<String, Object> conversations = evaluationManager.historyWithRatings(ratingFilter, searchTerm, page, pageSize);
             return ResponseEntity.ok(WebResponse.success(conversations).toMap());
         } catch (Exception e) {
             log.error("Get history with ratings failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to get history with ratings: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to get history with ratings: " + e.getMessage()).toMap());
         }
     }
 
@@ -1026,7 +1026,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Get rating analytics failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to get rating analytics: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to get rating analytics: " + e.getMessage()).toMap());
         }
     }
 
@@ -1041,7 +1041,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Clear all ratings failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to clear all ratings: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to clear all ratings: " + e.getMessage()).toMap());
         }
     }
 
@@ -1056,7 +1056,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Setup rating indices failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to setup rating indices: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to setup rating indices: " + e.getMessage()).toMap());
         }
     }
 
@@ -1066,12 +1066,12 @@ public class RouteController {
     @PostMapping("/rating/{trace_id}/rebuild_stats")
     public ResponseEntity<Map<String, Object>> rebuildStats(@PathVariable("trace_id") String traceId) {
         try {
-            RatingStats stats = evaluationManager.updateRatingStats(traceId, Optional.empty());
+            RatingStats stats = evaluationManager.updateRatingStats(traceId, null);
             return ResponseEntity.ok(WebResponse.success(stats).toMap());
         } catch (Exception e) {
             log.error("Rebuild stats failed for trace: " + traceId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to rebuild stats: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to rebuild stats: " + e.getMessage()).toMap());
         }
     }
 
@@ -1086,7 +1086,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Get current rating failed for trace: " + traceId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to get current rating: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to get current rating: " + e.getMessage()).toMap());
         }
     }
 
@@ -1101,7 +1101,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Get rating history failed for trace: " + traceId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to get rating history: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to get rating history: " + e.getMessage()).toMap());
         }
     }
 
@@ -1116,7 +1116,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Delete rating failed for trace: " + traceId, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to delete rating: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to delete rating: " + e.getMessage()).toMap());
         }
     }
 
@@ -1144,7 +1144,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("List prompts failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to list prompts: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to list prompts: " + e.getMessage()).toMap());
         }
     }
 
@@ -1167,7 +1167,7 @@ public class RouteController {
             Map<String, Object> existing = promptManager.getPrompt(promptKey, true);
             if (existing != null) {
                 return ResponseEntity.badRequest()
-                        .body(WebResponse.error(400, "Prompt already exists").toMap());
+                        .body(WebResponse.error(HttpStatus.BAD_REQUEST.value(), "Prompt already exists").toMap());
             }
             
             boolean success = promptManager.savePrompt(promptKey, promptContent, description, category, agentType,
@@ -1175,7 +1175,7 @@ public class RouteController {
             
             if (!success) {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(WebResponse.error(500, "Failed to create prompt").toMap());
+                        .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to create prompt").toMap());
             }
             
             Map<String, Object> responseData = new HashMap<>();
@@ -1187,7 +1187,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Create prompt failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to create prompt: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to create prompt: " + e.getMessage()).toMap());
         }
     }
 
@@ -1201,7 +1201,7 @@ public class RouteController {
         try {
             if (keyword == null || keyword.isEmpty()) {
                 return ResponseEntity.badRequest()
-                        .body(WebResponse.error(400, "Keyword is required").toMap());
+                        .body(WebResponse.error(HttpStatus.BAD_REQUEST.value(), "Keyword is required").toMap());
             }
             
             List<Map<String, Object>> results = promptManager.searchPrompts(keyword, category);
@@ -1215,7 +1215,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Search prompts failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to search prompts: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to search prompts: " + e.getMessage()).toMap());
         }
     }
 
@@ -1239,7 +1239,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Hot reload all prompts failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to hot reload all prompts: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to hot reload all prompts: " + e.getMessage()).toMap());
         }
     }
 
@@ -1263,7 +1263,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Hot reload agent prompt failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to hot reload agent prompt: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to hot reload agent prompt: " + e.getMessage()).toMap());
         }
     }
 
@@ -1287,7 +1287,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Hot reload prompt failed", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to hot reload prompt: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to hot reload prompt: " + e.getMessage()).toMap());
         }
     }
 
@@ -1314,7 +1314,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Get prompt failed: " + promptKey, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to get prompt: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to get prompt: " + e.getMessage()).toMap());
         }
     }
 
@@ -1356,7 +1356,7 @@ public class RouteController {
             
             if (!success) {
                 return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(WebResponse.error(500, "Failed to update prompt").toMap());
+                        .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to update prompt").toMap());
             }
             
             Map<String, Object> responseData = new HashMap<>();
@@ -1368,7 +1368,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Update prompt failed: " + promptKey, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to update prompt: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to update prompt: " + e.getMessage()).toMap());
         }
     }
 
@@ -1393,7 +1393,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Delete prompt failed: " + promptKey, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to delete prompt: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to delete prompt: " + e.getMessage()).toMap());
         }
     }
 
@@ -1414,7 +1414,7 @@ public class RouteController {
         } catch (Exception e) {
             log.error("Get prompt history failed: " + promptKey, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(WebResponse.error(500, "Failed to get prompt history: " + e.getMessage()).toMap());
+                    .body(WebResponse.error(HttpStatus.INTERNAL_SERVER_ERROR.value(), "Failed to get prompt history: " + e.getMessage()).toMap());
         }
     }
 }
