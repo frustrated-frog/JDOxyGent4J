@@ -317,6 +317,10 @@ public final class OxySpaceBeanCollector {
         checkInitialized();
         if (isDelayLoadOxyBeanSpace) {
             try {
+                List<BaseOxy> baseOxies = oxySpaceBeans.get(name);
+                if(null!=baseOxies){
+                    return baseOxies;
+                }
                 Method method = oxySpaceMethods.get(name);
                 if (method != null) {
                     method.setAccessible(true);

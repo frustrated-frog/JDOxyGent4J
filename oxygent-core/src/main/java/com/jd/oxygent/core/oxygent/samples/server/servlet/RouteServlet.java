@@ -107,8 +107,6 @@ public class RouteServlet extends HttpServlet {
     private final PromptManager promptManager = PromptManager.getInstance();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private Function<Map<String, Object>, Map<String, Object>> funcInterceptor = x -> null;
-    private Function<Map<String, Object>, Map<String, Object>> funcFilter = x -> x;
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     @Override
@@ -467,8 +465,8 @@ public class RouteServlet extends HttpServlet {
             payload = requestToPayload(payload, headers);
 
             // Apply interceptor
-            if (funcInterceptor != null) {
-                Object interceptedResponse = funcInterceptor.apply(payload);
+            if (mas.getFuncInterceptor() != null) {
+                Object interceptedResponse = mas.getFuncInterceptor().apply(payload);
                 if (interceptedResponse != null) {
                     sendJsonResponse(response, HttpServletResponse.SC_OK, (Map<String, Object>) interceptedResponse);
                     return;
@@ -511,8 +509,8 @@ public class RouteServlet extends HttpServlet {
             payload = requestToPayload(payload, headers);
 
             // Apply interceptor
-            if (funcInterceptor != null) {
-                Object interceptedResponse = funcInterceptor.apply(payload);
+            if (mas.getFuncInterceptor() != null) {
+                Object interceptedResponse = mas.getFuncInterceptor().apply(payload);
                 if (interceptedResponse != null) {
                     sendSseEvent(response, "message", interceptedResponse);
                     return;
@@ -597,8 +595,8 @@ public class RouteServlet extends HttpServlet {
             payload = requestToPayload(payload, headers);
 
             // Apply interceptor
-            if (funcInterceptor != null) {
-                Object interceptedResponse = funcInterceptor.apply(payload);
+            if (mas.getFuncInterceptor() != null) {
+                Object interceptedResponse = mas.getFuncInterceptor().apply(payload);
                 if (interceptedResponse != null) {
                     sendJsonResponse(response, HttpServletResponse.SC_OK, (Map<String, Object>) interceptedResponse);
                     return;
@@ -950,8 +948,8 @@ public class RouteServlet extends HttpServlet {
     private Map<String, Object> requestToPayload(Map<String, Object> payload, Map<String, String> headers) throws Exception {
 
         // Apply filter
-        if (funcFilter != null) {
-            payload = funcFilter.apply(payload);
+        if (mas.getFuncFilter()!= null) {
+            payload = mas.getFuncFilter().apply(payload);
         }
 
         // Set default query

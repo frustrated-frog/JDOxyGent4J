@@ -4,6 +4,7 @@ import com.jd.oxygent.core.oxygent.samples.server.LauncherLifecycle;
 import com.jd.oxygent.core.oxygent.samples.server.ServerConstants;
 import com.jd.oxygent.core.oxygent.samples.server.filter.MimeTypeFilter;
 import com.jd.oxygent.core.oxygent.samples.server.filter.RouteFilter;
+import com.jd.oxygent.core.oxygent.samples.server.scanner.ApiEndpointScanner;
 import jakarta.servlet.ServletException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.Context;
@@ -210,6 +211,21 @@ public class EmbeddedTomcatLauncher implements LauncherLifecycle {
 
             context.addChild(servletWrapper);
             ServerConstants.ROUTE_MAPPING.forEach(context::addServletMappingDecoded);
+
+            // Add Annotation RouteServlet
+            Wrapper annotationServletWrapper = context.createWrapper();
+            annotationServletWrapper.setName("AnnotationApiServlet");
+            annotationServletWrapper.setServletClass("com.jd.oxygent.core.oxygent.samples.server.servlet.AnnotationApiServlet");
+            annotationServletWrapper.setLoadOnStartup(2);
+
+            context.addChild(annotationServletWrapper);
+            context.addServletMappingDecoded("/api/*", "AnnotationApiServlet");
+
+            log.info("AnnotationApiServlet configuration completed");
+
+            // 初始化端点扫描（可以在这里指定扫描的包）
+            ApiEndpointScanner.scan(DEFAULT_API_ENDPOINT_SCANNER_PATH);
+
             log.info("RouteServlet configuration completed");
         } catch (Exception e) {
             log.error("Failed to configure Servlets", e);

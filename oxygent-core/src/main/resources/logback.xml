@@ -41,7 +41,7 @@
         </encoder>
     </appender>
     <!--    Define log output levels; name corresponds to specific package -->
-    <logger name="com.jd.oxygent" level="DEBUG"/>
+    <logger name="com.jd.oxygent" level="INFO"/>
     <root level="INFO">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="FILE"/>

@@ -88,7 +88,7 @@ public class BaseOxy {
 
     @JsonProperty("system_args")
     @Builder.Default
-    private List systemArgs = new ArrayList();
+    private List<String> systemArgs = new ArrayList();
 
     @JsonProperty("desc_for_llm")
     @Builder.Default
@@ -574,8 +574,8 @@ public class BaseOxy {
     }
 
     protected OxyRequest beforeExecute(OxyRequest oxyRequest) {
-        List<String> output = new ArrayList<>();
         if (precedingOxy != null && !precedingOxy.isEmpty()) {
+            List<String> output = new ArrayList<>();
             for (String oxyName : precedingOxy) {
                 Map<String, Object> kwargs = new HashMap<>();
                 kwargs.put("callee", oxyName);
@@ -583,8 +583,8 @@ public class BaseOxy {
                 OxyResponse oxyResponse = oxyRequest.call(kwargs);
                 output.add((String) oxyResponse.getOutput());
             }
+            oxyRequest.getArguments().put(precedingPlaceholder, String.join("\n", output));
         }
-        oxyRequest.getArguments().put(precedingPlaceholder, String.join("\n", output));
         return oxyRequest;
     }
 

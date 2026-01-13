@@ -104,11 +104,6 @@ public class RouteController {
     @Autowired
     Config config;
 
-    private Function<Map<String, Object>, Map<String, Object>> funcInterceptor = x -> null;
-
-    // Functional component (for request filtering and interception)
-    private Function<Map<String, Object>, Map<String, Object>> funcFilter = x -> x;
-
     /**
      * Redirect clients to the packaged web frontend.
      *
@@ -320,8 +315,8 @@ public class RouteController {
     private Map<String, Object> requestToPayload(Map<String, Object> payload, Map<String, String> headers) throws Exception {
 
         // Apply filter
-        if (funcFilter != null) {
-            payload = funcFilter.apply(payload);
+        if (mas.getFuncFilter()!= null) {
+            payload = mas.getFuncFilter().apply(payload);
         }
 
         // Set default query
@@ -381,8 +376,8 @@ public class RouteController {
             requestToPayload(payload, headers);
 
             // Apply interceptor
-            if (funcInterceptor != null) {
-                Object interceptedResponse = funcInterceptor.apply(payload);
+            if (mas.getFuncInterceptor() != null) {
+                Object interceptedResponse = mas.getFuncInterceptor().apply(payload);
                 if (interceptedResponse != null) {
                     return ResponseEntity.ok(interceptedResponse);
                 }
@@ -435,8 +430,8 @@ public class RouteController {
             requestToPayload(payload, safeHeaders);
 
             // Apply interceptor
-            if (funcInterceptor != null) {
-                Object interceptedResponse = funcInterceptor.apply(payload);
+            if (mas.getFuncInterceptor()!= null) {
+                Object interceptedResponse = mas.getFuncInterceptor().apply(payload);
                 if (interceptedResponse != null) {
                     emitter.send(interceptedResponse);
                     emitter.complete();
@@ -502,8 +497,8 @@ public class RouteController {
             requestToPayload(payload, headers);
 
             // Apply interceptor
-            if (funcInterceptor != null) {
-                Object interceptedResponse = funcInterceptor.apply(payload);
+            if (mas.getFuncInterceptor() != null) {
+                Object interceptedResponse = mas.getFuncInterceptor().apply(payload);
                 if (interceptedResponse != null) {
                     return ResponseEntity.ok((Map<String, Object>) interceptedResponse);
                 }

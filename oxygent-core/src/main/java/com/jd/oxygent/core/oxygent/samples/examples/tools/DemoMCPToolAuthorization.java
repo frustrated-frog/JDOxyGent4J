@@ -50,7 +50,7 @@ public class DemoMCPToolAuthorization {
         var baseUrl = EnvUtils.getEnv("OXY_LLM_BASE_URL");
         var modelName = EnvUtils.getEnv("OXY_LLM_MODEL_NAME");
 
-        var timeStreamableMcpTools = new StreamableMCPClient("time", "http://127.0.0.1:8100", "/mcp", Map.of(
+        var timeStreamableMcpTools = new StreamableMCPClient("time", "http://mcpgate.jd.com", "/api/mcp/f6bea60457504fc8945193a5b48479fc", Map.of(
                 "is_dynamic_headers", true,
                 "is_inherit_headers", true,
                 "headers", Map.of(
@@ -58,6 +58,7 @@ public class DemoMCPToolAuthorization {
                         "Authorization", "xm authorization xxxxxx "
                 )
         ));
+
 
         var timeSseMcpTools = new SSEMCPClient("time", "http://127.0.0.1:8100", "/sse", Map.of(
                 "is_dynamic_headers", true,
@@ -109,7 +110,7 @@ public class DemoMCPToolAuthorization {
         mas.init();
 
         // Simulate passing header parameters through HTTP request shared data
-        Map<String, Object> arguments = new HashMap<>(Map.of("query", "What time is it", "shared_data", headers, "request_id", CommonUtils.generateShortUUID()));
+        Map<String, Object> arguments = new HashMap<>(Map.of("query", "评价内容：这个商品不错，生成评价回复内容 苹果手机 幽默风趣 中 good", "shared_data", headers, "request_id", CommonUtils.generateShortUUID()));
         mas.chatWithAgent(arguments);
 
     }

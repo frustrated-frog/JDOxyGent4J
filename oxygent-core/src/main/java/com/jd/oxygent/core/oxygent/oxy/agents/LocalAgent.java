@@ -20,6 +20,8 @@ import com.jd.oxygent.core.Config;
 import com.jd.oxygent.core.oxygent.liveprompt.PromptManager;
 import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
 import com.jd.oxygent.core.oxygent.oxy.BaseTool;
+import com.jd.oxygent.core.oxygent.oxy.bank_tools.BankClient;
+import com.jd.oxygent.core.oxygent.oxy.bank_tools.BankTool;
 import com.jd.oxygent.core.oxygent.oxy.function_tools.FunctionHub;
 import com.jd.oxygent.core.oxygent.oxy.function_tools.FunctionTool;
 import com.jd.oxygent.core.oxygent.oxy.mcp.BaseMCPClient;
@@ -171,11 +173,17 @@ public class LocalAgent extends BaseAgent {
     @Builder.Default
     protected List<String> exceptTools = new ArrayList<>();
 
+    /**
+     * Banks available to this agent
+     */
+    @Builder.Default
+    protected List<String> banks = new ArrayList<>();
+
     // ========== Tool Retrieval Configuration ==========
 
     /**
      * Whether to enable tool search
-     * When true, the agent can dynamically search and discover new tools
+     * When true, the agent can dynamically search and discover new toolsBankTool
      */
     @Builder.Default
     protected boolean isSourcingTools = false;
@@ -319,6 +327,24 @@ public class LocalAgent extends BaseAgent {
                 }
             } else {
                 logger.warn("Unknown tool type: {}", oxy.getClass());
+            }
+        }
+
+        // banks
+        for (String oxyName : new HashSet<>(banks)) {
+            if (!this.getMas().getOxyNameToOxy().containsKey(oxyName)) {
+                throw new IllegalStateException("Bank [" + oxyName + "] not exists.");
+            }
+            BaseOxy oxy = this.getMas().getOxyNameToOxy().get(oxyName);
+            if (oxy instanceof BankTool) {
+                this.addPermittedTool(oxyName);
+            } else if (oxy instanceof BankClient) {
+                BankClient client = (BankClient) oxy;
+                for (String toolName : client.getIncludedBankNameList()) {
+                    this.addPermittedTool(toolName);
+                }
+            } else {
+                logger.warn("Unknown bank type: {}", oxy.getClass());
             }
         }
     }

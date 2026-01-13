@@ -21,6 +21,7 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import com.jd.oxygent.core.Config;
 import com.jd.oxygent.core.Mas;
 import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
+import com.jd.oxygent.core.oxygent.oxy.agents.LocalAgent;
 import com.jd.oxygent.core.oxygent.schemas.SSEMessage;
 import com.jd.oxygent.core.oxygent.utils.JsonUtils;
 import com.jd.oxygent.core.oxygent.utils.StringUtils;
@@ -730,7 +731,8 @@ public class OxyRequest implements Cloneable {
         if (!"user".equals(oxyRequest.getCallerCategory())
                 && oxy.isPermissionRequired()
                 && !(callerOxy.getPermittedToolNameList().contains(oxyName)
-                || callerOxy.getExtraPermittedToolNameList().contains(oxyName))) {
+                || callerOxy.getExtraPermittedToolNameList().contains(oxyName)
+                || callerOxy.getPermittedOxy().contains(oxyName))) {
 
             logger.severe(String.format(
                     "No permission for oxy: %s, caller: %s, trace_id=%s, node_id=%s",
@@ -752,7 +754,19 @@ public class OxyRequest implements Cloneable {
             if (args != null) {
                 args.put("app_name", Config.getAppName());
                 args.put("agent_name", callerOxy.getName());
+                args.put("top_k", ((LocalAgent)callerOxy).getTopKTools());
                 args.put("vearch_client", this.getMas().getVearchClient());
+            }
+        }
+
+        Map<String,Object> systemArgDict = new HashMap<String,Object>() {{
+                this.put("agent_pin",oxyRequest.caller);
+                this.put("user_pin",oxyRequest.getGroupData().getOrDefault("user_pin",""));
+        }};
+
+        for (String systemArg : oxy.getSystemArgs()) {
+            if(!oxyRequest.getArguments().containsKey(systemArg)){
+                oxyRequest.getArguments().put(systemArg,systemArgDict.get(systemArg));
             }
         }
         try {
@@ -798,6 +812,13 @@ public class OxyRequest implements Cloneable {
         }
     }
 
+
+    public void callAsync(Map<String, Object> kwargs){
+        CompletableFuture<Void> completableFuture = CompletableFuture.runAsync(() -> {
+            this.call(kwargs);
+        });
+        this.mas.getBackgroundTasks().add(completableFuture);
+    }
     /**
      * Start executing the specified callee and return execution result
      *

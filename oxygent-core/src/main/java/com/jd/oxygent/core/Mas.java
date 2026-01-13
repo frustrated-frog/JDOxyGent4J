@@ -169,6 +169,12 @@ public class Mas {
      */
     @JsonIgnore
     private Function<Map, Map> funcProcessMessageBody;
+    @JsonIgnore
+    private Function<Map<String, Object>, Map<String, Object>> funcInterceptor = x -> null;
+    @JsonIgnore
+    // Functional component (for request filtering and interception)
+    private Function<Map<String, Object>, Map<String, Object>> funcFilter = x -> x;
+
 
     /**
      * Default constructor, creates a MAS instance named "app"
@@ -639,12 +645,12 @@ public class Mas {
                     toolNameList.add(toolName);
                 }
             }
-            List<String> permittedOxyList = agent.getPermittedOxy();
-            if (permittedOxyList != null) {
-                for (String oxyName : permittedOxyList) {
-                    toolNameList.add(oxyName);
-                }
-            }
+//            List<String> permittedOxyList = agent.getPermittedOxy();
+//            if (permittedOxyList != null) {
+//                for (String oxyName : permittedOxyList) {
+//                    toolNameList.add(oxyName);
+//                }
+//            }
 
             addTools(children, toolNameList, tempPath);
 
@@ -754,7 +760,7 @@ public class Mas {
             batchInitOxy(BaseLlM.class);
             batchInitOxy(BaseTool.class);
             batchInitOxy(BaseFlow.class);
-            batchInitOxy(BaseAgent.class);
+//            batchInitOxy(BaseAgent.class);
             log.info("All Oxy components initialization completed");
 
         } catch (Exception e) {
