@@ -18,8 +18,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 注解驱动的API Servlet
- * 处理所有通过@ApiEndpoint注解注册的接口
+ * Annotation-driven API Servlet
+ * Handles all interfaces registered via @ApiEndpoint annotation
  */
 @Slf4j
 public class AnnotationApiServlet extends HttpServlet {
@@ -53,12 +53,12 @@ public class AnnotationApiServlet extends HttpServlet {
     }
 
     /**
-     * 统一处理请求
+     * Unified request handling
      */
     private void handleRequest(HttpServletRequest req, HttpServletResponse resp, String httpMethod) throws IOException {
         String path = req.getPathInfo();
 
-        // 获取端点信息
+        // Get endpoint information
         ApiEndpointScanner.EndpointInfo endpoint = ApiEndpointScanner.getEndpoint(path, httpMethod);
 
         if (endpoint == null) {
@@ -92,23 +92,23 @@ public class AnnotationApiServlet extends HttpServlet {
     }
 
     /**
-     * 解析请求参数
+     * Parse request parameters
      */
     private Map<String, Object> parseParameters(HttpServletRequest req,
                                                 ApiEndpointScanner.EndpointInfo endpoint) throws IOException {
         Map<String, Object> params = new HashMap<>();
 
-        // 解析路径参数
+        // Parse path parameters
         // TODO: 这里可以根据需要实现路径参数解析
 
-        // 解析查询参数
+        // Parse query parameters
         req.getParameterMap().forEach((key, values) -> {
             if (values.length > 0) {
                 params.put(key, values[0]);
             }
         });
 
-        // 解析JSON请求体（针对POST/PUT等）
+        // Parse JSON request body (for POST/PUT, etc.)
         if ("POST".equals(req.getMethod()) || "PUT".equals(req.getMethod()) || "PATCH".equals(req.getMethod())) {
             String contentType = req.getContentType();
             if (contentType != null && contentType.contains("application/json")) {
@@ -129,14 +129,14 @@ public class AnnotationApiServlet extends HttpServlet {
     }
 
     /**
-     * 调用端点方法
+     * Invoke endpoint method
      */
     private Object invokeEndpoint(ApiEndpointScanner.EndpointInfo endpoint,
                                   Map<String, Object> params) throws Exception {
         Method method = endpoint.getMethod();
         Object serviceInstance = endpoint.getServiceInstance();
 
-        // 准备方法参数
+        // Prepare method parameters
         Class<?>[] paramTypes = method.getParameterTypes();
         String[] paramNames = Arrays.stream(method.getParameters())
                 .map(p -> p.getName())
@@ -148,11 +148,11 @@ public class AnnotationApiServlet extends HttpServlet {
             String paramName = paramNames[i];
             Class<?> paramType = paramTypes[i];
 
-            // 从参数映射中获取值
+            // Get value from parameter map
             Object paramValue = params.get(paramName);
 
             if (paramValue == null) {
-                // 参数类型转换（根据类型设置默认值）
+                // Parameter type conversion (set default value based on type)
                 if (paramType == String.class) {
                     args[i] = "";
                 } else if (paramType == Integer.class || paramType == int.class) {
@@ -167,7 +167,7 @@ public class AnnotationApiServlet extends HttpServlet {
                     args[i] = null;
                 }
             } else {
-                // 类型转换
+                // Type conversion
                 args[i] = convertType(paramValue, paramType);
             }
         }
@@ -177,7 +177,7 @@ public class AnnotationApiServlet extends HttpServlet {
     }
 
     /**
-     * 类型转换
+     * Type conversion
      */
     private Object convertType(Object value, Class<?> targetType) {
         if (value == null) return null;
@@ -214,7 +214,7 @@ public class AnnotationApiServlet extends HttpServlet {
     }
 
     /**
-     * 发送JSON响应
+     * Send JSON response
      */
     private void sendJsonResponse(HttpServletResponse resp, Object data) throws IOException {
         resp.setContentType("application/json");

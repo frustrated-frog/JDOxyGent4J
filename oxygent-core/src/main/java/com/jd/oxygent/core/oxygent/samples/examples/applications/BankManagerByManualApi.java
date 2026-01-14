@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 银行管理器手动API - Python转换版
+ * Bank Manager Manual API - Python Conversion Version
  */
 @Slf4j
 public class BankManagerByManualApi {
@@ -22,13 +22,13 @@ public class BankManagerByManualApi {
     private Map<String, String> userProfiles = new HashMap<>();
 
     public BankManagerByManualApi() {
-        // 初始化一些示例数据
+        // Initialize some sample data
         userProfiles.put("001", "Arlen, a student, likes music");
         userProfiles.put("002", "Tom, a programmer, likes sports");
     }
 
     /**
-     * 用户档案检索请求类
+     * User Profile Retrieval Request Class
      */
     @Data
     public static class RetrievalRequest {
@@ -52,7 +52,7 @@ public class BankManagerByManualApi {
     }
 
     /**
-     * 用户档案存储请求类
+     * User Profile Deposit Request Class
      */
     @Data
     public static class DepositRequest {

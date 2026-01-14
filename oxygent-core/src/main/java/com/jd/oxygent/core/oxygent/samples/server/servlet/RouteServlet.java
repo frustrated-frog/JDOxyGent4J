@@ -111,7 +111,6 @@ public class RouteServlet extends HttpServlet {
 
     @Override
     protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-
         String requestURI = request.getRequestURI();
         String contextPath = request.getContextPath();
         String path = requestURI.substring(contextPath.length());

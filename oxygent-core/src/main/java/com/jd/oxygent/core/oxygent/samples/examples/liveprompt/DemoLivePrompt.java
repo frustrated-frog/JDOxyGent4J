@@ -78,6 +78,7 @@ public class DemoLivePrompt {
                                 """)
                         .promptKey("scientist_prompt")
                         .llmModel("default_llm")
+                        .userLivePrompt(true)
                         .build(),
                 ChatAgent.builder()
                         .name("a_great_scientist")
@@ -93,7 +94,7 @@ public class DemoLivePrompt {
                                 Answer in Chinese, with precision, elegance, and intellectual humility.
                                 """)
                         .llmModel("default_llm")
-                        .userLivePrompt(false)
+                        .userLivePrompt(true)
                         .build()
                 );
     }

@@ -14,7 +14,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 银行服务示例类
+ * Bank Service Example Class
  */
 @Slf4j
 public class BankManagerByApiRouter {
@@ -26,7 +26,7 @@ public class BankManagerByApiRouter {
     private Map<String, String> userProfiles = new HashMap<>();
 
     public BankManagerByApiRouter() {
-        // 初始化一些示例数据
+        // Initialize some sample data
         userProfiles.put("001", "Arlen, a student, likes music");
         userProfiles.put("002", "Tom, a programmer, likes sports");
     }
@@ -88,7 +88,7 @@ public class BankManagerByApiRouter {
                 if (method.isAnnotationPresent(ApiEndpoint.class)) {
                     ApiEndpoint endpoint = method.getAnnotation(ApiEndpoint.class);
 
-                    // 检查是否有"bank"标签
+                    // Check if there is a "bank" tag
                     boolean hasBankTag = false;
                     for (String tag : endpoint.tags()) {
                         if ("bank".equals(tag)) {
@@ -108,7 +108,7 @@ public class BankManagerByApiRouter {
                             if (param.isAnnotationPresent(ApiParam.class)) {
                                 ApiParam apiParam = param.getAnnotation(ApiParam.class);
 
-                                // 确定参数类型
+                                // Determine parameter type
                                 String paramType = getParamType(param.getType());
 
                                 Map<String, Object> paramSchema = new HashMap<>();

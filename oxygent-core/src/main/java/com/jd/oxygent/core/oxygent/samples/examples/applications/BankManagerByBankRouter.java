@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * 银行管理器 - BankRouter风格
+ * Bank Manager - BankRouter Style
  */
 @Slf4j
 public class BankManagerByBankRouter {
@@ -32,7 +32,7 @@ public class BankManagerByBankRouter {
     private static Map<String, String> userProfileDict = new ConcurrentHashMap<>();
 
     public BankManagerByBankRouter() {
-        // 初始化示例数据
+        // Initialize sample data
         userProfileDict.put("001", "Arlen, a student, likes music");
         userProfileDict.put("002", "Tom, a programmer, likes sports");
     }
@@ -74,7 +74,7 @@ public class BankManagerByBankRouter {
             this.put("chat", content);
             this.put("profile", userProfileDict.getOrDefault(user_pin, "Nothing"));
         }});
-        // 直接存储内容（简化处理，不调用LLM）
+        // Directly store content (simplified processing, no LLM call)
         userProfileDict.put(user_pin, output.toString());
         return output.toString();
     }

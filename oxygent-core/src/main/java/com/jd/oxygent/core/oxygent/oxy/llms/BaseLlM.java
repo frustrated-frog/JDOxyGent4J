@@ -275,16 +275,16 @@ public abstract class BaseLlM extends BaseOxy {
             if (isDisableSystemPrompt &&
                     !messages.isEmpty() && "system".equalsIgnoreCase(messages.get(0).getRole().name())) {
 
-                // 拼接 system prompt 和 user message
+                // Concatenate system prompt and user message
                 String systemContent = messages.get(0).getContent().toString();
                 String userContent = messages.get(1).getContent().toString();
                 String combinedContent = systemContent + "\nUser Input: " + userContent;
 
-                // 更新第二条消息（用户消息）的内容
+                // Update the content of the second message (user message)
                 messages.get(1).setContent(combinedContent);
-                // 移除第一条 system 消息
+                // Remove the first system message
                 messages = messages.subList(1, messages.size());
-                // 更新 arguments 中的 messages（注意：subList 是视图，若需要独立副本可 new ArrayList<>(...)）
+                // Update messages in arguments (Note: subList is a view, use new ArrayList<>(...) if independent copy is needed)
                 oxyRequest.getArguments().put("messages", new ArrayList<>(messages));
             }
 

@@ -42,7 +42,7 @@ public class AppMasterAgent {
 
                 // mac or linux usage
                 new StdioMCPClient("file_tools", "npx", Arrays.asList("-y", "@modelcontextprotocol/server-filesystem", "./local_file")),
-                //windows 写法
+                // Windows syntax
 //                new StdioMCPClient("file_tools", "cmd", Arrays.asList("/c", "npx", "-y", "@modelcontextprotocol/server-filesystem", "local_file")),
 
                 ReActAgent.builder()

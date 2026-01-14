@@ -6,34 +6,34 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * API参数注解，用于描述接口参数信息
+ * API parameter annotation, used to describe interface parameter information
  */
 @Target(ElementType.PARAMETER)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ApiParam {
 
     /**
-     * 参数名称
+     * Parameter name
      */
     String name() default "";
 
     /**
-     * 参数描述
+     * Parameter description
      */
     String description() default "";
 
     /**
-     * 是否必需参数
+     * Whether the parameter is required
      */
     boolean required() default true;
 
     /**
-     * 参数示例值
+     * Parameter example value
      */
     String example() default "";
 
     /**
-     * 参数默认值
+     * Parameter default value
      */
     String defaultValue() default "";
 }

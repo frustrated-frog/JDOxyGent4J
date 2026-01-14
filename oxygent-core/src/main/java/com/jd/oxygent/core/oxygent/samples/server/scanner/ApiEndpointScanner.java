@@ -17,7 +17,7 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 /**
- * API端点扫描器，使用JDK原生反射API扫描所有标记了@ApiEndpoint注解的方法
+ * API endpoint scanner that uses JDK native reflection API to scan all methods marked with @ApiEndpoint annotation
  */
 @Slf4j
 public class ApiEndpointScanner {
@@ -26,7 +26,7 @@ public class ApiEndpointScanner {
     private static final Map<String, Object> SERVICE_INSTANCES = new ConcurrentHashMap<>();
 
     /**
-     * 端点信息类
+     * Endpoint information class
      */
     public static class EndpointInfo {
         private final String path;
@@ -55,7 +55,7 @@ public class ApiEndpointScanner {
         public String[] getTags() { return tags; }
 
         /**
-         * 获取参数信息
+         * Get parameter information
          */
         public List<ParamInfo> getParamInfos() {
             List<ParamInfo> params = new ArrayList<>();
@@ -88,13 +88,13 @@ public class ApiEndpointScanner {
     }
 
     /**
-     * 扫描指定包下的所有API端点
+     * Scan all API endpoints under the specified package
      */
     public static void scan(String... basePackages) {
         try {
             log.info("Starting API endpoint scanning...");
 
-            // 清空之前的注册
+            // Clear previous registrations
             ENDPOINT_REGISTRY.clear();
             SERVICE_INSTANCES.clear();
 
@@ -123,7 +123,7 @@ public class ApiEndpointScanner {
     }
 
     /**
-     * 扫描指定包
+     * Scan specified package
      */
     private static void scanPackage(String basePackage) throws Exception {
         String packagePath = basePackage.replace('.', '/');
@@ -144,12 +144,12 @@ public class ApiEndpointScanner {
     }
 
     /**
-     * 扫描文件系统中的类
+     * Scan classes in file system
      */
     private static void scanFileSystemClasses(String packagePath, URL resource, String basePackage) throws Exception {
         String filePath = URLDecoder.decode(resource.getFile(), StandardCharsets.UTF_8);
         if (filePath.startsWith("/") && filePath.contains(":")) {
-            // Windows路径：去掉开头的斜杠
+            // Windows path: remove leading slash
             filePath = filePath.substring(1);
         }
         Path directory = Paths.get(filePath);
@@ -159,7 +159,7 @@ public class ApiEndpointScanner {
                 @Override
                 public FileVisitResult visitFile(Path file, BasicFileAttributes attrs) throws IOException {
                     if (file.toString().endsWith(".class")) {
-                        // 获取类名
+                        // Get class name
                         String relativePath = directory.relativize(file).toString();
                         String className = basePackage + "." +
                                 relativePath.replace(File.separatorChar, '.')
@@ -178,7 +178,7 @@ public class ApiEndpointScanner {
     }
 
     /**
-     * 扫描JAR文件中的类
+     * Scan classes in JAR file
      */
     private static void scanJarClasses(String packagePath, URL resource, String basePackage) throws Exception {
         String jarPath = resource.getPath().substring(5, resource.getPath().indexOf("!"));
@@ -208,7 +208,7 @@ public class ApiEndpointScanner {
     }
 
     /**
-     * 处理单个类，扫描其中的@ApiEndpoint注解方法
+     * Process single class, scan for @ApiEndpoint annotated methods
      */
     private static void processClass(Class<?> clazz) {
         try {
@@ -243,7 +243,7 @@ public class ApiEndpointScanner {
     }
 
     /**
-     * 判断是否需要处理该类
+     * Determine if this class needs to be processed
      */
     private static boolean shouldProcessClass(Class<?> clazz) {
         try {
@@ -330,12 +330,12 @@ public class ApiEndpointScanner {
     }
 
     /**
-     * 获取或创建服务实例
+     * Get or create service instance
      */
     private static synchronized Object getOrCreateServiceInstance(Class<?> serviceClass) throws Exception {
         String className = serviceClass.getName();
         if (SERVICE_INSTANCES.containsKey(className)) {
-            // 已经创建过实例，返回单例
+            // Instance already created, return singleton
             return SERVICE_INSTANCES.get(className);
         }
 
@@ -347,7 +347,7 @@ public class ApiEndpointScanner {
     }
 
     /**
-     * 注册端点
+     * Register endpoint
      */
     private static void registerEndpoint(ApiEndpoint annotation, Method method, Object serviceInstance) {
         try {
@@ -355,7 +355,7 @@ public class ApiEndpointScanner {
             ApiEndpoint.HttpMethod httpMethod = annotation.method();
             String key = generateKey(path, httpMethod);
 
-            // 检查是否已存在相同路径和方法的端点
+            // Check if endpoint with same path and method already exists
             if (ENDPOINT_REGISTRY.containsKey(key)) {
                 log.warn("Duplicate endpoint found: {} {}, ignoring...", httpMethod, path);
                 return;
@@ -381,14 +381,14 @@ public class ApiEndpointScanner {
     }
 
     /**
-     * 生成端点唯一键
+     * Generate endpoint unique key
      */
     private static String generateKey(String path, ApiEndpoint.HttpMethod method) {
         return method.name() + ":" + normalizePath(path);
     }
 
     /**
-     * 标准化路径（确保以/开头，不以/结尾）
+     * Normalize path (ensure starts with /, does not end with /)
      */
     private static String normalizePath(String path) {
         if (path == null || path.isEmpty()) {
@@ -409,14 +409,14 @@ public class ApiEndpointScanner {
     }
 
     /**
-     * 获取所有注册的端点
+     * Get all registered endpoints
      */
     public static Map<String, EndpointInfo> getEndpoints() {
         return new HashMap<>(ENDPOINT_REGISTRY);
     }
 
     /**
-     * 根据路径和方法获取端点
+     * Get endpoint by path and method
      */
     public static EndpointInfo getEndpoint(String path, String method) {
         String key = method.toUpperCase() + ":" + normalizePath(path);
@@ -424,7 +424,7 @@ public class ApiEndpointScanner {
     }
 
     /**
-     * 获取指定标签的端点列表
+     * Get endpoint list by specified tag
      */
     public static List<EndpointInfo> getEndpointsByTag(String tag) {
         List<EndpointInfo> result = new ArrayList<>();
@@ -439,7 +439,7 @@ public class ApiEndpointScanner {
     }
 
     /**
-     * 清空注册表
+     * Clear registry
      */
     public static void clear() {
         ENDPOINT_REGISTRY.clear();
@@ -447,7 +447,7 @@ public class ApiEndpointScanner {
     }
 
     /**
-     * 获取所有服务实例（用于调试和管理）
+     * Get all service instances (for debugging and management)
      */
     public static Map<String, Object> getServiceInstances() {
         return new HashMap<>(SERVICE_INSTANCES);

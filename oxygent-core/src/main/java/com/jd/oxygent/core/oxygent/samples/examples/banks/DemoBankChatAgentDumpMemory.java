@@ -18,17 +18,17 @@ import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.function.Function;
 /**
- * 银行聊天代理 - 保存记忆示例
+ * Bank chat agent - Save memory example
  */
 @Slf4j
 public class DemoBankChatAgentDumpMemory {
 
     static {
-        Config.getServer().setPort(8999); // 使用不同的端口
+        Config.getServer().setPort(8999); // Use different port
     }
 
     /**
-     * 过滤器函数 - 设置用户PIN
+     * Filter function - Set user PIN
      */
     public static Function<Map<String, Object>, Map<String, Object>> funcFilter = (payload) -> {
         Map<String, Object> groupData = new HashMap<>();
@@ -60,7 +60,7 @@ public class DemoBankChatAgentDumpMemory {
                         .precedingPlaceholder("preceding_text")
                         .funcProcessOutput((oxyResponse)->{
                             OxyRequest oxyRequest = oxyResponse.getOxyRequest();
-                            // 构建历史记录
+                            // Build history record
                             Map<String, String> history = new HashMap<>();
                             history.put("query", (String) oxyRequest.getArguments().get("query"));
                             history.put("answer", (String) oxyRequest.getArguments().get("output"));
@@ -80,7 +80,7 @@ public class DemoBankChatAgentDumpMemory {
     }
 
     /**
-     * 启动MAS并设置过滤器
+     * Start MAS and set filter
      */
     public static void main(String[] args) throws Exception {
         // 启动服务

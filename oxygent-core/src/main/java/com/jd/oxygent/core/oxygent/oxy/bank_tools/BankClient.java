@@ -40,7 +40,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * BankClient - 银行客户端，用于发现和注册远程银行工具
+ * BankClient - Bank client, used to discover and register remote bank tools
  */
 @SuperBuilder
 @NoArgsConstructor
@@ -56,7 +56,7 @@ public class BankClient extends BaseBank {
     private Map<String, String> headers = new HashMap<>();
 
     /**
-     * 初始化方法，发现远程银行工具
+     * Initialization method, discover remote bank tools
      */
     @Override
     public void init() {
@@ -64,7 +64,7 @@ public class BankClient extends BaseBank {
 
         try {
             String url = buildUrl(serverUrl, "list_banks");
-            log.info("BankClient '{}': 从 {} 发现银行工具", getName(), url);
+            log.info("BankClient '{}': Discovering bank tools from {}", getName(), url);
 
             // 构建请求头
             HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
@@ -96,7 +96,7 @@ public class BankClient extends BaseBank {
     }
 
     /**
-     * 添加工具到MAS
+     * Add tools to MAS
      */
     public void addTools(List<Map<String, Object>> toolsResponse) {
         if (toolsResponse == null) return;
@@ -104,7 +104,7 @@ public class BankClient extends BaseBank {
         Mas mas = getMas();
         if (mas == null) return;
 
-        // 排除的字段集合
+        // Excluded field set
         Set<String> excludeFields = new HashSet<>(Arrays.asList(
                 "sseUrl",        // sse_url
                 "serverUrl",     // server_url
@@ -134,7 +134,7 @@ public class BankClient extends BaseBank {
                 "isRetrievable"
         ));
 
-        // 获取排除字段后的参数
+        // Get parameters after excluding fields
         Map<String, Object> params = modelDump(excludeFields);
 
         for (Map<String, Object> item : toolsResponse) {
@@ -173,7 +173,7 @@ public class BankClient extends BaseBank {
     }
 
     /**
-     * 应用参数到目标对象
+     * Apply parameters to target object
      */
     private void applyParams(Object target, Map<String, Object> params) {
         if (target == null || params == null || params.isEmpty()) {
@@ -204,13 +204,13 @@ public class BankClient extends BaseBank {
                 }
 
             } catch (Exception e) {
-                log.debug("无法设置字段 {}: {}", fieldName, e.getMessage());
+                log.debug("Failed to set field {}: {}", fieldName, e.getMessage());
             }
         }
     }
 
     /**
-     * 构建URL
+     * Build URL
      */
     private String buildUrl(String baseUrl, String path) {
         if (baseUrl == null || baseUrl.isEmpty()) return path;
@@ -223,7 +223,7 @@ public class BankClient extends BaseBank {
     }
 
     /**
-     * 解析JSON数组字符串
+     * Parse JSON array string
      */
     private List<Map<String, Object>> parseJsonArray(String json) {
         List<Map<String, Object>> result = new ArrayList<>();
@@ -254,14 +254,14 @@ public class BankClient extends BaseBank {
                 }
             }
         } catch (Exception e) {
-            log.error("解析JSON失败", e);
+            log.error("Failed to parse JSON", e);
         }
 
         return result;
     }
 
     /**
-     * 从Map中获取字符串值
+     * Get string value from Map
      */
     private String getString(Map<String, Object> map, String key) {
         Object value = map.get(key);
@@ -269,7 +269,7 @@ public class BankClient extends BaseBank {
     }
 
     /**
-     * 模型转储方法 - 对应Python的model_dump
+     * Model dump method - corresponds to Python's model_dump
      */
     public Map<String, Object> modelDump(Set<String> excludeFields) {
         Map<String, Object> result = new HashMap<>();
@@ -299,7 +299,7 @@ public class BankClient extends BaseBank {
                         Object value = field.get(this);
                         result.put(fieldName, value);
                     } catch (IllegalAccessException e) {
-                        log.warn("无法访问字段: {}", fieldName, e);
+                        log.warn("Failed to access field: {}", fieldName, e);
                     }
                 }
 
@@ -308,7 +308,7 @@ public class BankClient extends BaseBank {
             }
 
         } catch (Exception e) {
-            log.error("modelDump失败", e);
+            log.error("modelDump failed", e);
         }
 
         return result;

@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.concurrent.Semaphore;
 
 /**
- * 银行ReActAgent自主性示例（通过MCP）
+ * Bank ReActAgent autonomy example (via MCP)
  */
 @Slf4j
 public class DemoBankReactAgentAutonomyByMCP {

@@ -19,7 +19,7 @@ import java.util.Map;
 import java.util.concurrent.Semaphore;
 
 /**
- * 银行ReActAgent固定模式示例
+ * Bank ReActAgent rigid mode example
  */
 @Slf4j
 public class DemoBankReactAgentRigid {

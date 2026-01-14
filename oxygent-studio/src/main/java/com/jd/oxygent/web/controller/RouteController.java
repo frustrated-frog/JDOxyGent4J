@@ -31,7 +31,6 @@ import com.jd.oxygent.core.oxygent.utils.CommonUtils;
 import com.jd.oxygent.core.oxygent.utils.DataUtils;
 import com.jd.oxygent.web.adapter.FileItemAdapter;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -71,7 +70,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -112,7 +110,7 @@ public class RouteController {
      */
     @GetMapping("/")
     public RedirectView readRoot() {
-        return new RedirectView("./web/index.html");
+        return new RedirectView("web.bak/index.html");
     }
 
     /**

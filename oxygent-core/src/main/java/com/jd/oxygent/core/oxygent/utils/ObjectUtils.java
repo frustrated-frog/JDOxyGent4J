@@ -170,19 +170,31 @@ public class ObjectUtils {
     }
 
     /**
-     * Deep copy of Map
+     * Deep copy of Object using JSON serialization
      *
-     * @param original
-     * @return
+     * @param original Original object to copy
+     * @return Deep copy of the original object, or null if copy fails
      */
     public static <T> T deepCopy(T original) {
+        if (original == null) {
+            return null;
+        }
         try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            String json = objectMapper.writeValueAsString(original);
-            return objectMapper.readValue(json, (Class<T>) original.getClass());
+            return OBJECT_MAPPER.readValue(
+                OBJECT_MAPPER.writeValueAsBytes(original),
+                (Class<T>) original.getClass()
+            );
         } catch (Exception e) {
-            e.printStackTrace();
+            // Use log instead of printStackTrace for better performance and logging management
+            java.util.logging.Logger.getLogger(ObjectUtils.class.getName())
+                .warning("Failed to deep copy object: " + e.getMessage());
             return null;
         }
     }
+
+    /**
+     * Thread-safe ObjectMapper instance for deep copying objects
+     * ObjectMapper is designed to be thread-safe and reused across calls
+     */
+    private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
 }

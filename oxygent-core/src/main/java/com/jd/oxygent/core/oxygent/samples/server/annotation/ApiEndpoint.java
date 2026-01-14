@@ -6,29 +6,29 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * API端点注解，用于标记需要暴露为HTTP接口的方法
+ * API endpoint annotation, used to mark methods that need to be exposed as HTTP interfaces
  */
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ApiEndpoint {
 
     /**
-     * 接口路径
+     * Interface path
      */
     String path();
 
     /**
-     * HTTP方法，默认为POST
+     * HTTP method, default is POST
      */
     HttpMethod method() default HttpMethod.POST;
 
     /**
-     * 接口描述
+     * Interface description
      */
     String description() default "";
 
     /**
-     * 标签/分类
+     * Tags/categories
      */
     String[] tags() default {};
 

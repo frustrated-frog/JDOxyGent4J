@@ -2,6 +2,7 @@ package com.jd.oxygent.core.oxygent.samples.server.tomcat;
 
 import com.jd.oxygent.core.oxygent.samples.server.LauncherLifecycle;
 import com.jd.oxygent.core.oxygent.samples.server.ServerConstants;
+import com.jd.oxygent.core.oxygent.samples.server.filter.CharacterEncodingFilter;
 import com.jd.oxygent.core.oxygent.samples.server.filter.MimeTypeFilter;
 import com.jd.oxygent.core.oxygent.samples.server.filter.RouteFilter;
 import com.jd.oxygent.core.oxygent.samples.server.scanner.ApiEndpointScanner;
@@ -223,8 +224,8 @@ public class EmbeddedTomcatLauncher implements LauncherLifecycle {
 
             log.info("AnnotationApiServlet configuration completed");
 
-            // 初始化端点扫描（可以在这里指定扫描的包）
-            ApiEndpointScanner.scan(DEFAULT_API_ENDPOINT_SCANNER_PATH);
+            // Initialize endpoint scanning (you can specify the package to scan here)
+        ApiEndpointScanner.scan(DEFAULT_API_ENDPOINT_SCANNER_PATH);
 
             log.info("RouteServlet configuration completed");
         } catch (Exception e) {
@@ -259,6 +260,18 @@ public class EmbeddedTomcatLauncher implements LauncherLifecycle {
         mimeTypefilterMap.setFilterName("mimeTypeFilter");
         mimeTypefilterMap.addURLPattern("/image/*");
         context.addFilterMap(mimeTypefilterMap);
+
+        // Add CharacterEncodingFilter
+        FilterDef characterEncodingFilterDef = new FilterDef();
+        characterEncodingFilterDef.setFilterName("characterEncodingFilter");
+        characterEncodingFilterDef.setFilterClass(CharacterEncodingFilter.class.getName());
+        context.addFilterDef(characterEncodingFilterDef);
+
+        // Map Filter to all requests
+        FilterMap characterEncodingFilterMap = new FilterMap();
+        characterEncodingFilterMap.setFilterName("characterEncodingFilter");
+        characterEncodingFilterMap.addURLPattern("/*");
+        context.addFilterMap(characterEncodingFilterMap);
     }
 
     /**
