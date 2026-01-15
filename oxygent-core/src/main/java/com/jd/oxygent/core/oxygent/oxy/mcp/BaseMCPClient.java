@@ -29,7 +29,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.http.HttpRequest;
-import java.util.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
@@ -91,6 +97,23 @@ public abstract class BaseMCPClient extends BaseTool {
 
     private static final Pattern DIGIT_PATTERN = Pattern.compile("text=\\{(.*?)}]", Pattern.DOTALL);
 
+    public static final List EXCLUDED_HEADERS = List.of(
+            "host",
+            "connection",
+            "sec-ch-ua",
+            "sec-ch-ua-mobile",
+            "sec-ch-ua-platform",
+            "user-agent",
+            "referer",
+            "accept-encoding",
+            "accept-language",
+            "cache-control",
+            "sec-fetch-site",
+            "sec-fetch-mode",
+            "sec-fetch-dest",
+            "accept",
+            "content-length");
+
     /**
      * Default constructor
      * <p>
@@ -122,39 +145,34 @@ public abstract class BaseMCPClient extends BaseTool {
                     .toArray(String[]::new);
             httpRequestBuilder.headers(params);
         } else {
-            Map<String, String> mergedHeaders;
+            Map<String, String> mergedHeaders = new HashMap<>();
             if (isDynamicHeaders) {
+                // If need to inherit headers
+                if (isInheritHeaders) {
+                    mergedHeaders = new HashMap<>(this.headers);
+                }
                 // Get headers from shared data, use empty map if not exists
                 Map<String, String> sharedHeaders = oxyRequest != null ? (Map<String, String>)
                         oxyRequest.getSharedData().getOrDefault("_headers", new HashMap<>()) : new HashMap<>();
-
-                // If need to inherit headers
-                if (isInheritHeaders) {
+                if (!sharedHeaders.isEmpty()) {
                     // Copy shared headers
-                    Map<String, String> _headers = new HashMap<>(sharedHeaders);
-
-                    // Remove host field (if exists)
-                    _headers.remove("host");
-
+                    Map<String, String> sharedHeadersCopy = new HashMap<>(sharedHeaders);
+                    // Remove EXCLUDED_HEADERS
+                    sharedHeadersCopy.keySet().removeIf(key -> EXCLUDED_HEADERS.contains(key.toLowerCase()));
                     // Merge: self.headers | _headers | shared_data.get("headers", {})
-                    mergedHeaders = new HashMap<>(this.headers);
-                    mergedHeaders.putAll(_headers);
+                    mergedHeaders.putAll(sharedHeadersCopy);
+                }
 
-                    // Merge headers from shared_data
-                    Map<String, String> dataHeaders = oxyRequest != null ? (Map<String, String>)
-                            oxyRequest.getSharedData().getOrDefault("headers", new HashMap<>()) : new HashMap<>();
-                    mergedHeaders.putAll(dataHeaders);
-                } else {
-                    // Don't inherit headers, only use headers from shared data
-                    Map<String, String> _headers = new HashMap<>(sharedHeaders);
-                    _headers.remove("host");
-
-                    // Merge: _headers | shared_data.get("headers", {})
-                    mergedHeaders = new HashMap<>(_headers);
-
-                    Map<String, String> dataHeaders = oxyRequest != null ? (Map<String, String>)
-                            oxyRequest.getSharedData().getOrDefault("headers", new HashMap<>()) : new HashMap<>();
-                    mergedHeaders.putAll(dataHeaders);
+                // Merge headers from shared_data
+                Map<String, String> dataHeaders = oxyRequest != null ? (Map<String, String>)
+                        oxyRequest.getSharedData().getOrDefault("headers", new HashMap<>()) : new HashMap<>();
+                if (!dataHeaders.isEmpty()) {
+                    // Copy shared headers
+                    Map<String, String> dataHeadersCopy = new HashMap<>(dataHeaders);
+                    // Remove EXCLUDED_HEADERS
+                    dataHeadersCopy.keySet().removeIf(key -> EXCLUDED_HEADERS.contains(key.toLowerCase()));
+                    // Merge: self.headers | _headers | shared_data.get("headers", {})
+                    mergedHeaders.putAll(dataHeadersCopy);
                 }
             } else {
                 // Don't use dynamic headers, directly use self.headers

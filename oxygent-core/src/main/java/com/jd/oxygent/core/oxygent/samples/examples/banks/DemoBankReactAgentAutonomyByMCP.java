@@ -52,7 +52,12 @@ public class DemoBankReactAgentAutonomyByMCP {
                         .tools(Arrays.asList("time_tools", "remote_user_profile_banks"))
                         .build(),
                 // SSE MCP客户端作为远程用户资料银行
-                new SSEMCPClient("remote_user_profile_banks", "http://127.0.0.1:8000/sse", "/sse", Map.of())
+                new SSEMCPClient("remote_user_profile_banks", "http://127.0.0.1:8000/sse", "/sse", Map.of(
+                        "is_dynamic_headers", true,
+                        "is_inherit_headers", true,
+                        "headers", Map.of(
+                                "test_key", "test_value"
+                        )))
         );
     }
 

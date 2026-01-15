@@ -272,7 +272,7 @@ public class BaseOxy {
                     Map<String, Object> paramInfo = (Map<String, Object>) paramInfoObj;
                     String description = (String) paramInfo.get("description");
                     if (description != null && description.startsWith("SystemArg")) {
-                        systemArgs.add(description.substring(10));
+                        systemArgs.add(description.substring(10)); // remove prefix "SystemArg."
                         continue;
                     }
 

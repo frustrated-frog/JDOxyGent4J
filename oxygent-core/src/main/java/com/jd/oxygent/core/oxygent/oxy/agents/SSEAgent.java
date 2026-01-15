@@ -242,7 +242,9 @@ public class SSEAgent extends RemoteAgent {
             // Add custom HTTP headers to initialization request
             if (customHeaders != null && !customHeaders.isEmpty()) {
                 for (Map.Entry<String, String> header : customHeaders.entrySet()) {
-                    requestSpec = requestSpec.header(header.getKey(), header.getValue());
+                    if (!EXCLUDED_HEADERS.contains(header.getKey().toLowerCase())) {
+                        requestSpec = requestSpec.header(header.getKey(), header.getValue());
+                    }
                 }
                 log.debug("Added {} custom headers to organization request", customHeaders.size());
             }
@@ -387,7 +389,7 @@ public class SSEAgent extends RemoteAgent {
             // Add custom HTTP headers
             if (customHeaders != null && !customHeaders.isEmpty()) {
                 for (Map.Entry<String, String> header : customHeaders.entrySet()) {
-                    if (EXCLUDED_HEADERS.contains(header.getKey().toLowerCase())) {
+                    if (!EXCLUDED_HEADERS.contains(header.getKey().toLowerCase())) {
                         requestSpec = requestSpec.header(header.getKey(), header.getValue());
                     }
                 }

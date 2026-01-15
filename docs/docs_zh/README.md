@@ -63,6 +63,7 @@
 + [处理附件和文件](./10-02-attachment_processing.md)
 + [创建分布式系统](./11-01-distributed.md)
 + [检索增强生成(RAG)](./12-01-rag.md)
++ [评价创建与管理](./16_rating_api.md)
 
 ## 开发工具
 
