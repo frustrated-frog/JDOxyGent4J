@@ -933,11 +933,11 @@ public class Mas {
                     esClient.index(Config.getAppName() + "_message", streamMessageData.get("message_id").toString(), streamMessageData);
                     streamDict.remove(nodeId);
                 } else {
-                    Map _copy = ObjectUtils.deepCopy(body);
+                    Map _copy = null;
                     if (funcProcessMessageBody != null) {
-                        _copy = funcProcessMessageBody.apply(_copy);
+                        _copy = funcProcessMessageBody.apply(body);
                     } else {
-                        removeAbandonedFields(_copy);
+                        _copy = removeAbandonedFields(body);
                     }
                     Map<String, Object> nonStreamMessageData = new HashMap<>();
                     nonStreamMessageData.put("message_id", sseMessage.getId());
@@ -948,7 +948,7 @@ public class Mas {
                     nonStreamMessageData.put("message", JsonUtils.writeValueAsString(_copy));
                     nonStreamMessageData.put("message_type", messageType);
                     nonStreamMessageData.put("message_event", sseMessage.getEvent());
-                    nonStreamMessageData.put("message_timestamp", body.get("timestamp") != null ? body.get("timestamp") : CommonUtils.getTimestamp());
+                    nonStreamMessageData.put("message_timestamp", _copy.get("timestamp") != null ? _copy.get("timestamp") : CommonUtils.getTimestamp());
                     nonStreamMessageData.put("create_time", CommonUtils.getFormatTime());
                     nonStreamMessageData.put("from_trace_id", content.get("from_trace_id"));
                     nonStreamMessageData.put("caller", content.get("caller"));
@@ -1428,26 +1428,28 @@ public class Mas {
     /**
      * Filter out some redundant fields before saving to ES
      *
-     * @param _copy
+     * @param body
      */
-    public void removeAbandonedFields(Map _copy) {
-        Map _content = _copy;
-        if (_copy.get("content") instanceof Map contentMap) {
-            _content = contentMap;
-        }
-        if (_content.get("arguments") instanceof Map argumentsMap) {
-            Map _arguments = argumentsMap;
-            _arguments.remove("agent_config");
-            _arguments.remove("messages");
-        }
-        if (_content.get("shared_data") instanceof Map shareddataMap) {
-            Map _sharedData = shareddataMap;
-            _sharedData.remove("_headers");
-            Object requestId = JsonUtils.firstNotBlank(_content.get("request_id"), _content.get("req_id"), _content.get("requestId"));
-            if (!"tool_call".equals(_copy.get("type")) || requestId == null || !firstQuerySet.contains(requestId)) {
-                _sharedData.remove("files");
-                _sharedData.remove("first_query_struct");
+    public Map removeAbandonedFields(Map body) {
+        if (body.get("content") instanceof Map contentMap && (contentMap.get("arguments") != null || contentMap.get("shared_data") != null)) {
+            Map _copy = ObjectUtils.deepCopy(body);
+            Map _content = (Map) _copy.get("content");
+            if (_content.get("arguments") instanceof Map argumentsMap) {
+                Map _arguments = argumentsMap;
+                _arguments.remove("agent_config");
+                _arguments.remove("messages");
             }
+            if (_content.get("shared_data") instanceof Map sharedDataMap) {
+                sharedDataMap.remove("_headers");
+                Object requestId = JsonUtils.firstNotBlank(_content.get("request_id"), _content.get("req_id"), _content.get("requestId"));
+                if (!"tool_call".equals(_copy.get("type")) || requestId == null || !firstQuerySet.contains(requestId)) {
+                    sharedDataMap.remove("files");
+                    sharedDataMap.remove("first_query_struct");
+                }
+            }
+            return _copy;
+        } else {
+            return body;
         }
     }
 
