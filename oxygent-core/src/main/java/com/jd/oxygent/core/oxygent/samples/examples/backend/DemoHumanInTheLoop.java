@@ -47,19 +47,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 
 /**
- * Demo class for reading config.json properties file
- *
- * <p>This class ports functionality from the Python version, demonstrating how to implement in Java:</p>
- * <ul>
- *   <li><strong>Read user-specified config.json properties file and start service</strong></li>
- * </ul>
- *
- * <h3>Features</h3>
- * <ul>
- *   <li><strong>Configuration Loading</strong>: Load configuration from external JSON files</li>
- *   <li><strong>Environment Support</strong>: Support different environments (dev, prod, etc.)</li>
- *   <li><strong>ReAct Agent</strong>: Demonstrates ReAct (Reasoning and Acting) agent functionality</li>
- * </ul>
+ * Demo class for manual send custom feedback, blocking get feedback stream
  *
  * @author OxyGent Team
  * @version 1.0.10.4
