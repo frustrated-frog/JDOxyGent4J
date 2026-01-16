@@ -15,6 +15,7 @@
  */
 package com.jd.oxygent.core.oxygent.oxy.llms;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.NullNode;
 import com.jd.oxygent.core.oxygent.utils.JsonUtils;
@@ -38,6 +39,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * HTTP-based LLM implementation for remote language model APIs.
@@ -67,6 +69,9 @@ public class HttpLlm extends RemoteLlm {
     private static volatile HttpClient httpClient = null;
     @Builder.Default
     private String streamOutputType = "stream";
+
+    @JsonIgnore
+    private Function<Exception, OxyResponse> funcProcessLlmException;
 
     public HttpLlm(String baseUrl, String apiKey, String modelName, Duration timeout, Map<String, Object> llmParams, Map<String, String> headers) {
         super(baseUrl, apiKey, modelName, timeout, llmParams, headers, null);
@@ -120,10 +125,14 @@ public class HttpLlm extends RemoteLlm {
             }
 
         } catch (Exception e) {
-            logger.error("LLM request exception", e);
-            OxyResponse oxyResponse = new OxyResponse();
-            oxyResponse.setOutput("");
-            return oxyResponse;
+            if (funcProcessLlmException != null) {
+                return funcProcessLlmException.apply(e);
+            } else {
+                logger.error("LLM request exception", e);
+                OxyResponse oxyResponse = new OxyResponse();
+                oxyResponse.setOutput("");
+                return oxyResponse;
+            }
         }
     }
 
@@ -366,7 +375,7 @@ public class HttpLlm extends RemoteLlm {
                 data = JsonUtils.readValue(responseBody, Map.class);
             } catch (Exception e) {
                 logger.error("Failed to parse response JSON: {}", responseBody);
-                throw new RuntimeException("Response is not valid JSON format: " + e.getMessage());
+                throw new RuntimeException("Response is not valid JSON format: " + e.getMessage(), e);
             }
 
             if (data.containsKey("error")) {
