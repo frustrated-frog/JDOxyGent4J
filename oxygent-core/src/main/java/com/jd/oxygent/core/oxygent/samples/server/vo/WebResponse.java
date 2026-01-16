@@ -48,6 +48,13 @@ public class WebResponse {
     }
 
     /**
+     * Create success response
+     */
+    public static WebResponse success(Object data, String message) {
+        return new WebResponse(200, message, data);
+    }
+
+    /**
      * Create error response
      */
     public static WebResponse error(int code, String message) {

@@ -17,6 +17,7 @@ package com.jd.oxygent.core.oxygent.utils;
 
 import com.github.f4b6a3.uuid.UuidCreator;
 import com.github.f4b6a3.uuid.codec.base.Base64UrlCodec;
+import jakarta.servlet.http.HttpServletRequest;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import org.slf4j.Logger;
@@ -37,6 +38,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -173,13 +176,13 @@ public class CommonUtils {
     }
 
     /**
-     * Get current Unix timestamp (in seconds)
-     *
-     * @return Current Unix timestamp string (in seconds)
+     * @return Equivalent to Python's datetime.now().timestamp().
      * @since 1.0.0
      */
-    public static String getTimestamp() {
-        return String.valueOf(Instant.now().getEpochSecond());
+    public static double getTimestamp() {
+        ZonedDateTime localNow = ZonedDateTime.now(ZoneId.systemDefault());
+        Instant instant = localNow.toInstant();
+        return instant.getEpochSecond() + instant.getNano() / 1_000_000_000.0;
     }
 
     /**
@@ -336,12 +339,15 @@ public class CommonUtils {
      * @throws RuntimeException         When image processing fails
      * @since 1.0.0
      */
-    public static String imageToBase64(String source, int maxImagePixels) {
+    public static String imageToBase64(String source, int maxImagePixels, String base64Prefix) {
         if (source == null || source.trim().isEmpty()) {
             throw new IllegalArgumentException("Image source cannot be null or empty string");
         }
         if (maxImagePixels <= 0) {
             throw new IllegalArgumentException("Maximum pixel count must be greater than 0");
+        }
+        if (StringUtils.isBlank(base64Prefix)) {
+            base64Prefix = "data:image";
         }
 
         var imageBytes = sourceToBytes(source);
@@ -373,18 +379,21 @@ public class CommonUtils {
             ImageIO.write(img, format, baos);
             var outputBytes = baos.toByteArray();
 
-            return "data:image;base64," + Base64.getEncoder().encodeToString(outputBytes);
+            return base64Prefix + ";base64," + Base64.getEncoder().encodeToString(outputBytes);
         } catch (Exception e) {
             throw new RuntimeException("Image processing failed: " + source, e);
         }
     }
 
-    public static String videoToBase64(String source, long maxVideoSize) {
+    public static String videoToBase64(String source, long maxVideoSize, String base64Prefix) {
+        if (StringUtils.isBlank(base64Prefix)) {
+            base64Prefix = "data:video";
+        }
         byte[] videoBytes = sourceToBytes(source);
         if (videoBytes.length > maxVideoSize) {
             return source;
         } else {
-            return "data:video;base64," + Base64.getEncoder().encodeToString(videoBytes);
+            return base64Prefix + ";base64," + Base64.getEncoder().encodeToString(videoBytes);
         }
     }
 
@@ -1106,4 +1115,44 @@ public class CommonUtils {
             return "image/jpeg"; // Default
         }
     }
+
+    public static <T> T getOrDefault(T data, T defaultValue) {
+        if (data == null || "".equals(data.toString()) || "null".equals(data.toString())) {
+            return defaultValue;
+        }
+        return data;
+    }
+
+    /**
+     * Get client IP
+     * @param request
+     * @return
+     */
+    public static String getClientIp(HttpServletRequest request) {
+        String[] headers = {
+                "X-Forwarded-For",
+                "X-Real-IP",
+                "Proxy-Client-IP",
+                "WL-Proxy-Client-IP",
+                "HTTP_X_FORWARDED_FOR",
+                "HTTP_X_REAL_IP",
+                "HTTP_PROXY_CLIENT_IP",
+                "HTTP_WL_PROXY_CLIENT_IP"
+        };
+        for (String header : headers) {
+            String ip = request.getHeader(header);
+            if (ip != null && ip.length() != 0 && !"unknown".equalsIgnoreCase(ip)) {
+                // X-Forwarded-For 可能包含多个 IP，取第一个非 unknown 的
+                if (header.equalsIgnoreCase("X-Forwarded-For")) {
+                    int commaIndex = ip.indexOf(',');
+                    if (commaIndex != -1) {
+                        ip = ip.substring(0, commaIndex).trim();
+                    }
+                }
+                return ip;
+            }
+        }
+        return request.getRemoteAddr();
+    }
+
 }

@@ -1,5 +1,7 @@
 package com.jd.oxygent.core.oxygent.samples.server.utils;
 
+import com.jd.oxygent.core.oxygent.samples.server.ServerConstants;
+import com.jd.oxygent.core.oxygent.samples.server.annotation.ApiEndpoint;
 import com.jd.oxygent.core.oxygent.samples.server.masprovider.engine.OxySpaceBeanCollector;
 import com.jd.oxygent.core.oxygent.samples.server.masprovider.engine.annotation.OxySpaceBean;
 
@@ -23,6 +25,10 @@ public final class GlobalDefaultOxySpaceMapping {
                         OxySpaceBeanCollector.DEFAULT_STARTUP_OXYSPACE_BEAN_NAME = "".equals(annotation.name()) ? annotation.value() : annotation.name();
                         break;
                     }
+                }
+                ApiEndpoint apiEndpointAnnotation = method.getAnnotation(ApiEndpoint.class);
+                if (apiEndpointAnnotation != null&&ServerConstants.DEFAULT_API_ENDPOINT_SCANNER_PATH.isEmpty()) {
+                    ServerConstants.DEFAULT_API_ENDPOINT_SCANNER_PATH=hasOxySpaceBeanClass.getName();
                 }
             }
         }

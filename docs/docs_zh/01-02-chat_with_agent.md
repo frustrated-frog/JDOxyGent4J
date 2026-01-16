@@ -199,13 +199,14 @@ public class DirectCallDemo {
         mas.setOxySpace(oxySpace);
         mas.init();
 
-        List<Map<String, String>> messages = Arrays.asList(
-            Map.of("role", "system", "content", "You are a helpful assistant"),
-            Map.of("role", "user", "content", "hello")
-        );
+     Memory memory = new Memory();
+     memory.setMessages(Arrays.asList(
+             Message.systemMessage("You are a helpful assistant"),
+             Message.userMessage("hello")
+     ));
 
         Map<String, Object> arguments = Map.of("messages", messages);
-        var result = mas.call("master_agent", arguments);
+        var result = mas.call("default_llm", arguments);
         System.out.println(result);
     }
 }

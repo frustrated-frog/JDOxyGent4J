@@ -1,21 +1,14 @@
-/**
- * Mermaid SDK for Gantt Chart Generation
- * @author OxyGent Team
- * @version 1.0.0
- * @since 1.0.0
- */
-
 function formatTimeWithMilliseconds(timeString) {
-    // Split date and time parts
+    // 拆分日期和时间部分
     const [datePart, timePart] = timeString.split(' ');
 
-    // Split time part
+    // 拆分时间部分
     const [hms, fractions] = timePart.split('.');
 
-    // Extract first 3 digits of milliseconds (pad with 0 if less than 3 digits)
+    // 提取前3位毫秒（如果不足3位则补0）
     const milliseconds = fractions ? fractions.substring(0, 3).padEnd(3, '0') : '000';
 
-    // Combine into new format
+    // 组合成新格式
     return `${datePart} ${hms}.${milliseconds}`;
 }
 
@@ -27,9 +20,9 @@ function unionName(data) {
 function generateGrant(taskList) {
     let ganttCode = `gantt \n`;
     ganttCode += `dateFormat  YYYY-MM-DD HH:mm:ss.SSS \n`;
-    // Add sections
-    // ganttCode += `    section Project Phases\n`;
-    // Add tasks
+    // 添加节(Section)
+    // ganttCode += `    section 项目阶段\n`;
+    // 添加任务
     taskList.forEach(task => {
         if (task.sectionName) {
             ganttCode += `section ${task.sectionName}\n`;

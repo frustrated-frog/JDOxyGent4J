@@ -15,7 +15,9 @@
  */
 package com.jd.oxygent.core.oxygent.oxy.llms;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.NullNode;
 import com.jd.oxygent.core.oxygent.utils.JsonUtils;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyResponse;
@@ -37,6 +39,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * HTTP-based LLM implementation for remote language model APIs.
@@ -61,12 +64,17 @@ import java.util.Map;
 public class HttpLlm extends RemoteLlm {
     private static final Logger logger = LoggerFactory.getLogger(HttpLlm.class);
 
+    /** Http Client Version */
+    private HttpClient.Version httpVersion = null;
     private static volatile HttpClient httpClient = null;
     @Builder.Default
     private String streamOutputType = "stream";
 
+    @JsonIgnore
+    private Function<Exception, OxyResponse> funcProcessLlmException;
+
     public HttpLlm(String baseUrl, String apiKey, String modelName, Duration timeout, Map<String, Object> llmParams, Map<String, String> headers) {
-        super(baseUrl, apiKey, modelName, timeout, llmParams, headers);
+        super(baseUrl, apiKey, modelName, timeout, llmParams, headers, null);
         setSaveData(true);
     }
 
@@ -84,14 +92,6 @@ public class HttpLlm extends RemoteLlm {
             }
         }
         return httpClient;
-    }
-
-    protected Map<String, String> headers(OxyRequest oxyRequest) {
-        HashMap<String, String> resultHeadMap = new HashMap<>();
-        if (MapUtils.isNotEmpty(this.headers)) {
-            resultHeadMap.putAll(this.headers);
-        }
-        return resultHeadMap;
     }
 
     /**
@@ -125,10 +125,14 @@ public class HttpLlm extends RemoteLlm {
             }
 
         } catch (Exception e) {
-            logger.error("LLM request exception", e);
-            OxyResponse oxyResponse = new OxyResponse();
-            oxyResponse.setOutput("");
-            return oxyResponse;
+            if (funcProcessLlmException != null) {
+                return funcProcessLlmException.apply(e);
+            } else {
+                logger.error("LLM request exception", e);
+                OxyResponse oxyResponse = new OxyResponse();
+                oxyResponse.setOutput("");
+                return oxyResponse;
+            }
         }
     }
 
@@ -206,7 +210,7 @@ public class HttpLlm extends RemoteLlm {
         } else {
             payload.put("messages", this._getMessages(oxyRequest));
             payload.put("model", modelName);
-            payload.put("stream", false);
+            payload.put("stream", true);
             if (llmParams != null) {
                 payload.putAll(llmParams);
             }
@@ -236,6 +240,9 @@ public class HttpLlm extends RemoteLlm {
                 .timeout(Duration.ofSeconds((long) this.getTimeout()))
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
 
+        if (this.httpVersion != null) {
+            requestBuilder.version(this.httpVersion);
+        }
         requestHeaders.forEach(requestBuilder::header);
         HttpRequest request = requestBuilder.build();
 
@@ -261,7 +268,7 @@ public class HttpLlm extends RemoteLlm {
 
             String line;
             while ((line = reader.readLine()) != null) {
-                if (line.startsWith("data: ")) {
+                if (line.startsWith("data:")) {
                     String jsonData = line.substring(6).trim();
 
                     if (jsonData.isEmpty() || "[DONE]".equals(jsonData)) {
@@ -280,9 +287,7 @@ public class HttpLlm extends RemoteLlm {
                             contentMap.put("delta", content);
                             contentMap.put("agent", oxyRequest.getCaller());
                             contentMap.put("node_id", oxyRequest.getNodeId());
-                            contentMap.put("current_trace_id", oxyRequest.getCurrentTraceId());
                             streamMessage.put("content", contentMap);
-                            streamMessage.put("_is_stored", false);
 
                             oxyRequest.sendMessage(streamMessage);
                         }
@@ -305,10 +310,7 @@ public class HttpLlm extends RemoteLlm {
                                 contentMap.put("delta", content);
                                 contentMap.put("agent", oxyRequest.getCaller());
                                 contentMap.put("node_id", oxyRequest.getNodeId());
-                                contentMap.put("current_trace_id", oxyRequest.getCurrentTraceId());
                                 streamMessage.put("content", contentMap);
-                                streamMessage.put("_is_stored", false);
-
                                 oxyRequest.sendMessage(streamMessage);
                             }
                         }
@@ -321,6 +323,13 @@ public class HttpLlm extends RemoteLlm {
             logger.error("Error reading streaming response", e);
             throw new RuntimeException("Failed to read streaming response", e);
         }
+
+        Map<String, Object> streamMessage = new HashMap<>();
+        streamMessage.put("type", "stream_end");
+        streamMessage.put("delta", "");
+        streamMessage.put("agent", oxyRequest.getCaller());
+        streamMessage.put("node_id", oxyRequest.getNodeId());
+        oxyRequest.sendMessage(streamMessage);
 
         OxyResponse oxyResponse = new OxyResponse();
         oxyResponse.setOutput(result.toString());
@@ -339,6 +348,9 @@ public class HttpLlm extends RemoteLlm {
                 .timeout(Duration.ofSeconds((long) this.getTimeout()))
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody));
 
+        if (this.httpVersion != null) {
+            requestBuilder.version(this.httpVersion);
+        }
         requestHeaders.forEach(requestBuilder::header);
         HttpRequest request = requestBuilder.build();
 
@@ -363,7 +375,7 @@ public class HttpLlm extends RemoteLlm {
                 data = JsonUtils.readValue(responseBody, Map.class);
             } catch (Exception e) {
                 logger.error("Failed to parse response JSON: {}", responseBody);
-                throw new RuntimeException("Response is not valid JSON format: " + e.getMessage());
+                throw new RuntimeException("Response is not valid JSON format: " + e.getMessage(), e);
             }
 
             if (data.containsKey("error")) {
@@ -405,7 +417,11 @@ public class HttpLlm extends RemoteLlm {
                         JsonNode parts = content.get("parts");
                         if (parts != null && parts.isArray() && parts.size() > 0) {
                             JsonNode text = parts.get(0).get("text");
-                            return text != null ? text.asText() : null;
+                            if (text == null || (text instanceof NullNode nn && nn.isNull())) {
+                                return null;
+                            } else {
+                                return text.asText();
+                            }
                         }
                     }
                 }
@@ -415,14 +431,27 @@ public class HttpLlm extends RemoteLlm {
                     JsonNode delta = choices.get(0).get("delta");
                     if (delta != null) {
                         JsonNode content = delta.get("content");
-                        return content != null ? content.asText() : null;
+                        if (content == null || content.isNull()) {
+                            content = delta.get("reasoning_content");
+                            if (content == null || content.isNull()) {
+                                return null;
+                            } else {
+                                return content.asText();
+                            }
+                        } else {
+                            return content.asText();
+                        }
                     }
                 }
             } else {
                 JsonNode message = node.get("message");
-                if (message != null) {
+                if (message != null && !message.isNull()) {
                     JsonNode content = message.get("content");
-                    return content != null ? content.asText() : null;
+                    if (content == null || content.isNull()) {
+                        return null;
+                    } else {
+                        return content.asText();
+                    }
                 }
             }
         } catch (Exception e) {
@@ -449,7 +478,7 @@ public class HttpLlm extends RemoteLlm {
                 }
             } else if (useOpenai) {
                 Object choices = data.get("choices");
-                if (choices instanceof List && !((List<?>) choices).isEmpty()) {
+                if (choices != null && choices instanceof List && !((List<?>) choices).isEmpty()) {
                     Map<String, Object> message = (Map<String, Object>) ((Map<String, Object>) ((List<?>) choices).get(0)).get("message");
                     if (message != null) {
                         Object content = message.get("content");

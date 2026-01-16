@@ -19,12 +19,25 @@ package com.jd.oxygent.core.oxygent.samples.server.servlet;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.github.f4b6a3.uuid.UuidCreator;
 import com.jd.oxygent.core.Config;
+import com.jd.oxygent.core.EvaluationManager;
 import com.jd.oxygent.core.Mas;
+import com.jd.oxygent.core.oxygent.liveprompt.DynamicAgentManager;
+import com.jd.oxygent.core.oxygent.liveprompt.PromptManager;
 import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
 import com.jd.oxygent.core.oxygent.samples.server.masprovider.MasFactoryRegistry;
 import com.jd.oxygent.core.oxygent.samples.server.utils.FileValidationUtil;
 import com.jd.oxygent.core.oxygent.samples.server.utils.RecursivePackageInstantiator;
-import com.jd.oxygent.core.oxygent.samples.server.vo.*;
+import com.jd.oxygent.core.oxygent.samples.server.vo.AgentNodeConverter;
+import com.jd.oxygent.core.oxygent.samples.server.vo.ItemRequest;
+import com.jd.oxygent.core.oxygent.samples.server.vo.OrganizationWrapper;
+import com.jd.oxygent.core.oxygent.samples.server.vo.ScriptRequest;
+import com.jd.oxygent.core.oxygent.samples.server.vo.WebResponse;
+import com.jd.oxygent.core.oxygent.schemas.SSEMessage;
+import com.jd.oxygent.core.oxygent.schemas.evaluation.ConversationRating;
+import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingRequest;
+import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingResponse;
+import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingStats;
+import com.jd.oxygent.core.oxygent.schemas.evaluation.RatingType;
 import com.jd.oxygent.core.oxygent.schemas.memory.Memory;
 import com.jd.oxygent.core.oxygent.schemas.memory.Message;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
@@ -54,14 +67,28 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.Enumeration;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.*;
+import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.DEFAULT_FILE_STORE_TEMP_DIR;
+import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.DEFAULT_MEMORY_SIZE_THRESHOLD;
+import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.DEFAULT_UPLOAD_ALL_FILE_MAX_SIZE_THRESHOLD;
+import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.DEFAULT_UPLOAD_FILE_MAX_SIZE_THRESHOLD;
+import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.RESTRICTED_HEADERS;
 
 /**
  * Main routing servlet for OxyGent server that handles various HTTP endpoints
@@ -72,23 +99,18 @@ import static com.jd.oxygent.core.oxygent.samples.server.ServerConstants.*;
  * @since 1.0.0
  */
 @Slf4j
-@WebServlet(name = "RouteServlet", urlPatterns = {
-        "/", "/check_alive", "/get_organization", "/get_first_query",
-        "/get_welcome_message", "/list_script", "/save_script", "/load_script",
-        "/chat", "/sse/chat", "/async/chat", "/node", "/view", "/call", "/upload"
-}, loadOnStartup = 1)
+@WebServlet(name = "RouteServlet", loadOnStartup = 1)
 public class RouteServlet extends HttpServlet {
 
     private final Mas mas = MasFactoryRegistry.getFactory().createMas();
+    private final EvaluationManager evaluationManager = EvaluationManager.getInstance();
+    private final PromptManager promptManager = PromptManager.getInstance();
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    private Function<Map<String, Object>, Map<String, Object>> funcInterceptor = x -> null;
-    private Function<Map<String, Object>, Map<String, Object>> funcFilter = x -> x;
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
     @Override
     protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-
         String requestURI = request.getRequestURI();
         String contextPath = request.getContextPath();
         String path = requestURI.substring(contextPath.length());
@@ -98,58 +120,82 @@ public class RouteServlet extends HttpServlet {
         try {
             switch (path) {
                 case "/":
-                    handleRoot(request, response);
+                    root(request, response);
                     break;
                 case "/check_alive":
-                    handleCheckAlive(request, response);
+                    checkAlive(request, response);
                     break;
                 case "/get_organization":
-                    handleGetOrganization(request, response);
+                    getOrganization(request, response);
                     break;
                 case "/get_first_query":
-                    handleGetFirstQuery(request, response);
+                    getFirstQuery(request, response);
                     break;
                 case "/get_welcome_message":
-                    handleGetWelcomeMessage(request, response);
+                    getWelcomeMessage(request, response);
                     break;
                 case "/list_script":
-                    handleListScript(request, response);
+                    listScript(request, response);
                     break;
                 case "/save_script":
-                    handleSaveScript(request, response);
+                    saveScript(request, response);
                     break;
                 case "/load_script":
-                    handleLoadScript(request, response);
+                    loadScript(request, response);
                     break;
                 case "/api/group_uid":
-                    handleGroupId(request, response);
+                    groupId(request, response);
                     break;
                 case "/api/trace_uid":
-                    handleTraceId(request, response);
+                    traceId(request, response);
                     break;
                 case "/chat":
-                    handleChat(request, response);
+                    chat(request, response);
                     break;
                 case "/sse/chat":
-                    handleSseChat(request, response);
+                    sseChat(request, response);
                     break;
                 case "/async/chat":
-                    handleAsyncChat(request, response);
+                    asyncChat(request, response);
                     break;
                 case "/node":
-                    handleGetNodeInfo(request, response);
+                    getNodeInfo(request, response);
                     break;
                 case "/view":
-                    handleGetTaskInfo(request, response);
+                    getTaskInfo(request, response);
                     break;
                 case "/call":
-                    handleCall(request, response);
+                    call(request, response);
                     break;
                 case "/upload":
-                    handleUploadFile(request, response);
+                    uploadFile(request, response);
+                    break;
+                case "/feedback":
+                    feedback(request, response);
+                    break;
+                case "/get_agents":
+                    getAgents(request, response);
+                    break;
+                case "/rating":
+                    rating(request, response);
+                    break;
+                case "/history_with_ratings":
+                    historyWithRatings(request, response);
+                    break;
+                case "/analytics/ratings":
+                    analyticsRatings(request, response);
                     break;
                 default:
-                    response.sendError(HttpServletResponse.SC_NOT_FOUND, "Path not found: " + path);
+                    // Handle prompt API routes
+                    if (path.startsWith("/api/prompts/")) {
+                        promptApiRoutes(path, request, response);
+                    }
+                    // Handle other rating-related routes
+                    else if (path.startsWith("/rating/")) {
+                        ratingRoutes(path, request, response);
+                    } else {
+                        response.sendError(HttpServletResponse.SC_NOT_FOUND, "Path not found: " + path);
+                    }
                     break;
             }
         } catch (Exception e) {
@@ -161,23 +207,22 @@ public class RouteServlet extends HttpServlet {
     /**
      * Redirect client to packaged web frontend
      */
-    private void handleRoot(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void root(HttpServletRequest request, HttpServletResponse response) throws IOException {
         response.sendRedirect("./index.html");
     }
 
     /**
      * Health check endpoint
      */
-    private void handleCheckAlive(HttpServletRequest request, HttpServletResponse response) throws IOException {
-        Map<String, Object> result = new HashMap<>();
-        result.put("alive", 1);
+    private void checkAlive(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Map<String, Object> result = Map.of("alive", 1);
         sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(result).toMap());
     }
 
     /**
      * Get agent organization structure
      */
-    private void handleGetOrganization(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void getOrganization(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             OrganizationWrapper organizedWithPath = AgentNodeConverter.convertToOrganization(mas.getAgentOrganization());
             sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(organizedWithPath).toMap());
@@ -191,7 +236,7 @@ public class RouteServlet extends HttpServlet {
     /**
      * Get first query
      */
-    private void handleGetFirstQuery(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void getFirstQuery(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             String firstQuery = mas.getFirstQuery() != null && !mas.getFirstQuery().isEmpty()
                     ? mas.getFirstQuery() : Config.getServer().getFirstQuery();
@@ -207,10 +252,9 @@ public class RouteServlet extends HttpServlet {
     /**
      * Get welcome message
      */
-    private void handleGetWelcomeMessage(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void getWelcomeMessage(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
-            String welcomeMessage = Config.getServer().getWelcomeMessage() != null
-                    ? Config.getServer().getWelcomeMessage() : "";
+            String welcomeMessage = Config.getAgent().getWelcomeMessage();
             Map<String, Object> data = Map.of("welcome_message", welcomeMessage);
             sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(data).toMap());
         } catch (Exception e) {
@@ -223,7 +267,7 @@ public class RouteServlet extends HttpServlet {
     /**
      * List all saved scripts
      */
-    private void handleListScript(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void listScript(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             String scriptSaveDir = Paths.get(Config.getXfile().getSaveDir(), "script").toString();
             Files.createDirectories(Paths.get(scriptSaveDir));
@@ -231,12 +275,9 @@ public class RouteServlet extends HttpServlet {
             File dir = new File(scriptSaveDir);
             String[] files = dir.list((d, name) -> name.endsWith(".json"));
 
-            List<String> scripts = new ArrayList<>();
-            if (files != null) {
-                scripts = Arrays.stream(files)
-                        .map(file -> file.substring(0, file.lastIndexOf(".")))
-                        .collect(Collectors.toList());
-            }
+            List<String> scripts = files != null ? Arrays.stream(files)
+                    .map(file -> file.substring(0, file.lastIndexOf(".")))
+                    .collect(Collectors.toList()) : List.of();
 
             Map<String, Object> data = Map.of("scripts", scripts);
             sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(data).toMap());
@@ -251,10 +292,9 @@ public class RouteServlet extends HttpServlet {
     /**
      * Get session ID
      */
-    private void handleGroupId(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void groupId(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
-            Map<String, Object> result = new HashMap<>();
-            result.put("uuid", UuidCreator.getShortSuffixComb().toString());
+            Map<String, Object> result = Map.of("uuid", UuidCreator.getShortSuffixComb().toString());
             sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(result).toMap());
         } catch (Exception e) {
             log.error("group_uid generate failed", e);
@@ -266,10 +306,9 @@ public class RouteServlet extends HttpServlet {
     /**
      * Get single request trace ID
      */
-    private void handleTraceId(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void traceId(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
-            Map<String, Object> result = new HashMap<>();
-            result.put("uuid", UuidCreator.getShortSuffixComb().toString());
+            Map<String, Object> result = Map.of("uuid", UuidCreator.getShortSuffixComb().toString());
             sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(result).toMap());
         } catch (Exception e) {
             log.error("trace_uid generate failed", e);
@@ -316,7 +355,7 @@ public class RouteServlet extends HttpServlet {
     private Map<String, Object> readRequestParam(HttpServletRequest request, String paramName) throws IOException {
         String paramValue = request.getParameter(paramName);
         if (paramValue == null || paramValue.trim().isEmpty()) {
-            return new HashMap<>();
+            return Map.of();
         }
         return objectMapper.readValue(paramValue, Map.class);
     }
@@ -353,7 +392,7 @@ public class RouteServlet extends HttpServlet {
     /**
      * Save script
      */
-    private void handleSaveScript(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void saveScript(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             ScriptRequest script = objectMapper.readValue(readRequestBodyAsString(request), ScriptRequest.class);
 
@@ -375,9 +414,16 @@ public class RouteServlet extends HttpServlet {
     }
 
     /**
-     * Load script
+     * Load a previously saved script.
+     *
+     *     Args:
+     *         script_id: Timestamp‑based identifier returned by :func:`save_script`.
+     *
+     *     Returns:
+     *         dict: ``WebResponse`` containing the original ``contents`` array or an
+     *         error message when the file is missing.
      */
-    private void handleLoadScript(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void loadScript(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             String itemId = request.getParameter("item_id");
             if (itemId == null || itemId.trim().isEmpty()) {
@@ -410,7 +456,7 @@ public class RouteServlet extends HttpServlet {
     /**
      * Chat interface - synchronous mode
      */
-    private void handleChat(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void chat(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             Map<String, Object> payload = readRequestBody(request);
             Map<String, String> headers = extractHeaders(request);
@@ -418,8 +464,8 @@ public class RouteServlet extends HttpServlet {
             payload = requestToPayload(payload, headers);
 
             // Apply interceptor
-            if (funcInterceptor != null) {
-                Object interceptedResponse = funcInterceptor.apply(payload);
+            if (mas.getFuncInterceptor() != null) {
+                Object interceptedResponse = mas.getFuncInterceptor().apply(payload);
                 if (interceptedResponse != null) {
                     sendJsonResponse(response, HttpServletResponse.SC_OK, (Map<String, Object>) interceptedResponse);
                     return;
@@ -440,7 +486,7 @@ public class RouteServlet extends HttpServlet {
     /**
      * SSE chat interface - server-sent events mode
      */
-    private void handleSseChat(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void sseChat(HttpServletRequest request, HttpServletResponse response) throws IOException {
         response.setContentType("text/event-stream;charset=UTF-8");
         response.setHeader("Cache-Control", "no-cache");
         response.setHeader("Connection", "keep-alive");
@@ -462,8 +508,8 @@ public class RouteServlet extends HttpServlet {
             payload = requestToPayload(payload, headers);
 
             // Apply interceptor
-            if (funcInterceptor != null) {
-                Object interceptedResponse = funcInterceptor.apply(payload);
+            if (mas.getFuncInterceptor() != null) {
+                Object interceptedResponse = mas.getFuncInterceptor().apply(payload);
                 if (interceptedResponse != null) {
                     sendSseEvent(response, "message", interceptedResponse);
                     return;
@@ -501,7 +547,7 @@ public class RouteServlet extends HttpServlet {
             this.mas.getActiveTasks().put(currentTraceId, task);
 
             // Start event stream
-            eventStream(redisKey, currentTraceId, task, response);
+            processRedisMessage(redisKey, currentTraceId, task, response);
 
         } catch (Exception e) {
             log.error("SSE chat failed", e);
@@ -510,9 +556,37 @@ public class RouteServlet extends HttpServlet {
     }
 
     /**
+     * Feedback interface
+     * @param request
+     * @param response
+     * @throws IOException
+     */
+    private void feedback(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        Map<String, Object> payload = readRequestBody(request);
+        String channelId = (String) payload.getOrDefault("channel_id", "");
+        if (!mas.feedbackDict.containsKey(channelId)) {
+            sendError(response, HttpServletResponse.SC_BAD_REQUEST, "illegal channel_id: " + channelId);
+        }
+        LinkedBlockingQueue<String> feedbackQueue = mas.feedbackDict.get(channelId);
+        String data = (String) payload.getOrDefault("data", "");
+        if (feedbackQueue == null) {
+            feedbackQueue = new LinkedBlockingQueue<>();
+            mas.feedbackDict.put(channelId, feedbackQueue);
+        }
+        try {
+            feedbackQueue.put(data);
+            feedbackQueue.put(""); // stream end symbol
+        } catch (InterruptedException e) {
+            log.error("Feedback queue put failed", e);
+            sendError(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, e.getMessage());
+        }
+        sendJsonResponse(response, HttpServletResponse.SC_OK, Map.of("channel_id", channelId));
+    }
+
+    /**
      * Asynchronous chat interface
      */
-    private void handleAsyncChat(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void asyncChat(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             Map<String, Object> payload = readRequestBody(request);
             Map<String, String> headers = extractHeaders(request);
@@ -520,8 +594,8 @@ public class RouteServlet extends HttpServlet {
             payload = requestToPayload(payload, headers);
 
             // Apply interceptor
-            if (funcInterceptor != null) {
-                Object interceptedResponse = funcInterceptor.apply(payload);
+            if (mas.getFuncInterceptor() != null) {
+                Object interceptedResponse = mas.getFuncInterceptor().apply(payload);
                 if (interceptedResponse != null) {
                     sendJsonResponse(response, HttpServletResponse.SC_OK, (Map<String, Object>) interceptedResponse);
                     return;
@@ -564,7 +638,7 @@ public class RouteServlet extends HttpServlet {
     /**
      * Get node information
      */
-    private void handleGetNodeInfo(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void getNodeInfo(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             String itemId = request.getParameter("item_id");
             if (itemId == null || itemId.trim().isEmpty()) {
@@ -573,8 +647,7 @@ public class RouteServlet extends HttpServlet {
             }
 
             // Search nodes
-            Map<String, Object> query = new HashMap<>();
-            query.put("query", Map.of("term", Map.of("_id", itemId)));
+            Map<String, Object> query = Map.of("query", Map.of("term", Map.of("_id", itemId)));
 
             Map<String, Object> esResponse = mas.getEsClient().search(Config.getAppName() + "_node", query);
 
@@ -638,12 +711,12 @@ public class RouteServlet extends HttpServlet {
 
                     // Remove prompt
                     Map<String, Object> input = (Map<String, Object>) nodeData.get("input");
-                    Map<String, Object> classAttr = (Map<String, Object>) input.get("class_attr");
+                    Map<String, Object> classAttr = input != null ? (Map<String, Object>) input.get("class_attr") : Map.of();
                     if (classAttr.containsKey("prompt")) {
                         classAttr.remove("prompt");
                     }
 
-                    // Process environment variables
+                    // Process environment variablesx
                     Map<String, String> envValueToKey = new HashMap<>();
                     System.getenv().forEach((k, v) -> envValueToKey.put(v, k));
 
@@ -652,8 +725,8 @@ public class RouteServlet extends HttpServlet {
                     nodeData.put("data_range_map", dataRangeMap);
 
                     List<Map<String, Object>> trees = Arrays.asList(classAttr,
-                            (Map<String, Object>) classAttr.getOrDefault("llm_params", new HashMap<>()),
-                            (Map<String, Object>) input.get("arguments"));
+                            (Map<String, Object>) classAttr.getOrDefault("llm_params", Map.of()),
+                            input != null ? (Map<String, Object>) input.get("arguments") : Map.of());
 
                     for (Map<String, Object> tree : trees) {
                         if (tree == null) {
@@ -700,7 +773,7 @@ public class RouteServlet extends HttpServlet {
     /**
      * Get task information
      */
-    private void handleGetTaskInfo(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void getTaskInfo(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             String itemId = request.getParameter("item_id");
             if (itemId == null || itemId.trim().isEmpty()) {
@@ -776,13 +849,13 @@ public class RouteServlet extends HttpServlet {
     /**
      * Call OxyGent agent
      */
-    private void handleCall(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void call(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             ItemRequest item = objectMapper.readValue(readRequestBodyAsString(request), ItemRequest.class);
 
             // Process environment variables pattern matching
             List<Map<String, Object>> trees = Arrays.asList(item.getClassAttr(),
-                    (Map<String, Object>) item.getClassAttr().getOrDefault("llm_params", new HashMap<>()),
+                    (Map<String, Object>) item.getClassAttr().getOrDefault("llm_params", Map.of()),
                     item.getArguments()
             );
 
@@ -874,8 +947,8 @@ public class RouteServlet extends HttpServlet {
     private Map<String, Object> requestToPayload(Map<String, Object> payload, Map<String, String> headers) throws Exception {
 
         // Apply filter
-        if (funcFilter != null) {
-            payload = funcFilter.apply(payload);
+        if (mas.getFuncFilter()!= null) {
+            payload = mas.getFuncFilter().apply(payload);
         }
 
         // Set default query
@@ -899,7 +972,7 @@ public class RouteServlet extends HttpServlet {
             // Deduplicate attachments
             payload.put("attachments", attachmentsWithPath);
             if (!remoteUrls.isEmpty()) {
-                List<String> existingUrls = (List<String>) payload.getOrDefault("web_file_url_list", new ArrayList<>());
+                List<String> existingUrls = (List<String>) payload.getOrDefault("web_file_url_list", List.of());
                 Set<String> allUrls = new LinkedHashSet<>(existingUrls);
                 allUrls.addAll(remoteUrls);
                 payload.put("web_file_url_list", new ArrayList<>(allUrls));
@@ -911,11 +984,11 @@ public class RouteServlet extends HttpServlet {
         }
 
         // Set current trace_id
-        payload.putIfAbsent("current_trace_id", CommonUtils.generateShortUUID());
-        // Get request headers
-        payload.putIfAbsent("shared_data", new HashMap<String, Object>());
-        // Add request headers
-        ((Map<String, Object>) payload.get("shared_data")).put("_headers", headers);
+            payload.putIfAbsent("current_trace_id", CommonUtils.generateShortUUID());
+            // Get request headers
+            payload.putIfAbsent("shared_data", Map.of());
+            // Add request headers
+            ((Map<String, Object>) payload.get("shared_data")).put("_headers", headers);
 
         return payload;
     }
@@ -923,11 +996,11 @@ public class RouteServlet extends HttpServlet {
     /**
      * Event stream handler
      */
-    private void eventStream(String redisKey, String currentTraceId, CompletableFuture<OxyResponse> task,
-                             HttpServletResponse response) throws Exception {
+    private void processRedisMessage(String redisKey, String currentTraceId, CompletableFuture<OxyResponse> task,
+                                     HttpServletResponse response) throws Exception {
         try {
             while (true) {
-                // Read message from Redis
+                // Read message from Redis, Polling to prevent latency
                 Object rpop = mas.getRedisClient().brpop(redisKey);
                 if (rpop == null) {
                     Thread.sleep(100);
@@ -935,8 +1008,9 @@ public class RouteServlet extends HttpServlet {
                 }
 
                 // Unpack message
-                Map<String, Object> msgMap = mas.unpackMessage(Base64.getDecoder().decode((String) rpop));
-                if (msgMap != null) {
+                SSEMessage<Map<String, Object>> sseMessage = mas.unpackMessage(Base64.getDecoder().decode((String) rpop));
+                if (sseMessage != null && sseMessage.getData() != null) {
+                    Map<String, Object> msgMap = sseMessage.getData();
                     // Check if it is a close event
                     if (msgMap.containsKey("event")) {
                         sendSseEvent(response, (String) msgMap.get("event"), msgMap);
@@ -968,9 +1042,9 @@ public class RouteServlet extends HttpServlet {
                             content.put("output", CommonUtils.toJson(content.get("output")));
                         }
                     }
+                    // Send message
+                    sendSseEvent(response, "message", msgMap);
                 }
-                // Send message
-                sendSseEvent(response, "message", msgMap);
             }
         } catch (InterruptedException e) {
             log.info("SSE connection terminated。trace_id: {}", currentTraceId);
@@ -1002,7 +1076,7 @@ public class RouteServlet extends HttpServlet {
      * Accepts user uploaded files and saves them to the server's uploads directory.
      * File names are prefixed with timestamps to avoid conflicts.
      */
-    private void handleUploadFile(HttpServletRequest request, HttpServletResponse response) throws IOException {
+    private void uploadFile(HttpServletRequest request, HttpServletResponse response) throws IOException {
         try {
             // Configure upload parameters
             DiskFileItemFactory factory = new DiskFileItemFactory();
@@ -1039,12 +1113,830 @@ public class RouteServlet extends HttpServlet {
             Files.copy(fileItem.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
             // Return file path
-            Map<String, Object> data = new HashMap<>();
-            data.put("file_name", fileName);
+            Map<String, Object> data = Map.of("file_name", fileName);
             sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(data).toMap());
         } catch (Exception e) {
             log.error("File upload failed", e);
             sendError(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "File upload failed: " + e.getMessage());
         }
     }
+
+    /**
+     * Handle prompt API routes
+     */
+    private void promptApiRoutes(String path, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        // Parse path segments
+        String[] segments = path.startsWith("/") ? path.substring(1).split("/") : path.split("/");
+        String method = request.getMethod();
+
+        try {
+            // Handle different prompt API endpoints
+            if (path.equals("/api/prompts/")) {
+                if (method.equals("GET")) {
+                    listPrompts(request, response);
+                } else if (method.equals("POST")) {
+                    createPrompt(request, response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else if (path.equals("/api/prompts/search/")) {
+                // /api/prompts/search/
+                if (method.equals("GET")) {
+                    searchPrompts(request, response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else if (segments.length >= 5 && segments[3].equals("hot-reload") && segments[4].equals("all")) {
+                // /api/prompts/hot-reload/all
+                if (method.equals("POST")) {
+                    hotReloadAllAgentPrompts(response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else if (segments.length >= 5 && segments[3].equals("hot-reload") && segments[4].equals("agent")) {
+                // /api/prompts/hot-reload/agent/{agent_name}
+                if (method.equals("POST")) {
+                    String agentName = segments[5];
+                    hotReloadAgentPrompt(agentName, response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else if (segments.length >= 5 && segments[3].equals("hot-reload")) {
+                // /api/prompts/hot-reload/{prompt_key}
+                if (method.equals("POST")) {
+                    String promptKey = segments[4];
+                    hotReloadPrompt(promptKey, response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else if (segments.length >= 4 && segments[3].equals("history")) {
+                // /api/prompts/{prompt_key}/history
+                if (method.equals("GET")) {
+                    String promptKey = segments[2];
+                    getPromptHistory(promptKey, response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else if (segments.length >= 4 && segments[3].equals("version")) {
+                // /api/prompts/{prompt_key}/version/{version}
+                if (method.equals("GET")) {
+                    String promptKey = segments[2];
+                    int version = Integer.parseInt(segments[4]);
+                    getPromptVersion(promptKey, version, response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else if (segments.length >= 4 && segments[3].equals("revert")) {
+                // /api/prompts/{prompt_key}/revert/{target_version}
+                if (method.equals("POST")) {
+                    String promptKey = segments[2];
+                    int targetVersion = Integer.parseInt(segments[4]);
+                    revertPromptToVersion(promptKey, targetVersion, response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else if (segments.length >= 3) {
+                // /api/prompts/{prompt_key}
+                String promptKey = segments[2];
+                if (method.equals("GET")) {
+                    getPrompt(promptKey, response);
+                } else if (method.equals("PUT")) {
+                    updatePrompt(promptKey, request, response);
+                } else if (method.equals("DELETE")) {
+                    deletePrompt(promptKey, response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else {
+                response.sendError(HttpServletResponse.SC_NOT_FOUND, "Path not found: " + path);
+            }
+        } catch (Exception e) {
+            log.error("Handle prompt API failed: " + path, e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Internal server error: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Handle rating-related routes
+     */
+    private void ratingRoutes(String path, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        // Parse path segments
+        String[] segments = path.split("/");
+        String method = request.getMethod();
+
+        try {
+            // Handle different rating endpoints
+            if (segments.length == 3 && segments[2].equals("clear_all")) {
+                // /rating/clear_all
+                if (method.equals("DELETE")) {
+                    clearAllRatingData(response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else if (segments.length == 3 && segments[2].equals("setup_indices")) {
+                // /rating/setup_indices
+                if (method.equals("POST")) {
+                    setupRatingIndices(response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else if (segments.length == 4 && segments[3].equals("rebuild_stats")) {
+                // /rating/{trace_id}/rebuild_stats
+                if (method.equals("POST")) {
+                    String traceId = segments[2];
+                    rebuildRatingStats(traceId, response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else if (segments.length == 4 && segments[2].equals("current")) {
+                // /rating/{trace_id}/current
+                if (method.equals("GET")) {
+                    String traceId = segments[3];
+                    String erp = request.getParameter("erp");
+                    getCurrentRating(traceId, erp, response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else if (segments.length == 4 && segments[2].equals("history")) {
+                // /rating/{trace_id}/history
+                if (method.equals("GET")) {
+                    String traceId = segments[3];
+                    String erp = request.getParameter("erp");
+                    getRatingHistory(traceId, erp, response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else if (segments.length == 3) {
+                // /rating/{trace_id}
+                if (method.equals("GET")) {
+                    String traceId = segments[2];
+                    getRatingStats(traceId, response);
+                } else if (method.equals("DELETE")) {
+                    String ratingId = segments[2];
+                    deleteRating(ratingId, response);
+                } else {
+                    response.sendError(HttpServletResponse.SC_METHOD_NOT_ALLOWED, "Method not allowed");
+                }
+            } else {
+                response.sendError(HttpServletResponse.SC_NOT_FOUND, "Path not found: " + path);
+            }
+        } catch (Exception e) {
+            log.error("Handle rating route failed: " + path, e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Internal server error: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * List prompts
+     */
+    private void listPrompts(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        try {
+            String category = request.getParameter("category");
+            String agentType = request.getParameter("agent_type");
+            String isActiveStr = request.getParameter("is_active");
+            Boolean isActive = isActiveStr != null ? Boolean.parseBoolean(isActiveStr) : null;
+            String tagsStr = request.getParameter("tags");
+            List<String> tags = tagsStr != null ? Arrays.asList(tagsStr.split(",")) : null;
+
+            List<Map<String, Object>> prompts = promptManager.listPrompts(category, agentType, isActive, tags);
+
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully retrieved prompt list",
+                    "data", prompts
+            );
+
+            sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
+        } catch (Exception e) {
+            log.error("List prompts failed", e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to list prompts: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Search prompts
+     */
+    private void searchPrompts(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        try {
+            String keyword = request.getParameter("keyword");
+            String category = request.getParameter("category");
+
+            if (keyword == null || keyword.isEmpty()) {
+                sendJsonResponse(response, HttpServletResponse.SC_BAD_REQUEST, WebResponse.error(400, "Keyword is required").toMap());
+                return;
+            }
+
+            List<Map<String, Object>> results = promptManager.searchPrompts(keyword, category);
+
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully searched prompts",
+                    "data", results
+            );
+
+            sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
+        } catch (Exception e) {
+            log.error("Search prompts failed", e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to search prompts: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Hot reload specified prompt to all related agents
+     */
+    private void hotReloadPrompt(String promptKey, HttpServletResponse response) throws IOException {
+        try {
+            boolean success = DynamicAgentManager.hotReloadPrompt(promptKey);
+
+            Map<String, Object> responseData = Map.of(
+                    "success", success,
+                    "message", "Successfully hot reloaded prompt",
+                    "data", Map.of(
+                            "prompt_key", promptKey,
+                            "hot_reload_success", success
+                    )
+            );
+
+            sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
+        } catch (Exception e) {
+            log.error("Hot reload prompt failed", e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to hot reload prompt: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Hot reload prompt for specified agent
+     */
+    private void hotReloadAgentPrompt(String agentName, HttpServletResponse response) throws IOException {
+        try {
+            boolean success = DynamicAgentManager.hotReloadAgent(agentName);
+
+            Map<String, Object> responseData = Map.of(
+                    "success", success,
+                    "message", "Successfully hot reloaded agent prompt",
+                    "data", Map.of(
+                            "agent_name", agentName,
+                            "hot_reload_success", success
+                    )
+            );
+
+            sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
+        } catch (Exception e) {
+            log.error("Hot reload agent prompt failed", e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to hot reload agent prompt: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Hot reload all agent prompts
+     */
+    private void hotReloadAllAgentPrompts(HttpServletResponse response) throws IOException {
+        try {
+            boolean results = DynamicAgentManager.hotReloadAllPrompts();
+
+            Map<String, Object> responseData = Map.of(
+                    "success", results,
+                    "message", "Successfully completed batch hot reload",
+                    "data", Map.of(
+                            "reload_success", results,
+                            "reload_time", LocalDateTime.now().format(DATE_TIME_FORMATTER)
+                    )
+            );
+            sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
+        } catch (Exception e) {
+            log.error("Hot reload all prompts failed", e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to hot reload all prompts: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get single prompt
+     */
+    private void getPrompt(String promptKey, HttpServletResponse response) throws IOException {
+        try {
+            Map<String, Object> prompt = promptManager.getPrompt(promptKey, true);
+
+            if (prompt == null) {
+                sendJsonResponse(response, HttpServletResponse.SC_NOT_FOUND,
+                        WebResponse.error(404, "Prompt not found").toMap());
+                return;
+            }
+
+            prompt.put("id", promptKey);
+
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully retrieved prompt",
+                    "data", prompt
+            );
+
+            sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
+        } catch (Exception e) {
+            log.error("Get prompt failed: " + promptKey, e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to get prompt: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Create prompt
+     */
+    private void createPrompt(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        try {
+            Map<String, Object> requestBody = readRequestBody(request);
+
+            String promptKey = (String) requestBody.get("prompt_key");
+            String promptContent = (String) requestBody.get("prompt_content");
+            String description = (String) requestBody.getOrDefault("description", "");
+            String category = (String) requestBody.getOrDefault("category", "custom");
+            String agentType = (String) requestBody.getOrDefault("agent_type", "");
+            boolean isActive = (boolean) requestBody.getOrDefault("is_active", true);
+            List<String> tags = (List<String>) requestBody.getOrDefault("tags", List.of());
+            String createdBy = (String) requestBody.getOrDefault("created_by", "user");
+
+            // Check if prompt already exists
+            Map<String, Object> existing = promptManager.getPrompt(promptKey, true);
+            if (existing != null) {
+                sendJsonResponse(response, HttpServletResponse.SC_BAD_REQUEST,
+                        WebResponse.error(400, "Prompt already exists").toMap());
+                return;
+            }
+
+            boolean success = promptManager.savePrompt(promptKey, promptContent, description, category, agentType,
+                    1, isActive, tags, createdBy);
+
+            if (!success) {
+                sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                        WebResponse.error(500, "Failed to create prompt").toMap());
+                return;
+            }
+
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully created prompt",
+                    "data", Map.of("prompt_key", promptKey)
+            );
+
+            sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
+        } catch (Exception e) {
+            log.error("Create prompt failed", e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to create prompt: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Update prompt
+     */
+    private void updatePrompt(String promptKey, HttpServletRequest request, HttpServletResponse response) throws IOException {
+        try {
+            Map<String, Object> requestBody = readRequestBody(request);
+
+            // Get existing prompt
+            Map<String, Object> existing = promptManager.getPrompt(promptKey, true);
+            if (existing == null) {
+                sendJsonResponse(response, HttpServletResponse.SC_NOT_FOUND,
+                        WebResponse.error(404, "Prompt not found").toMap());
+                return;
+            }
+
+            // Extract update data
+            String promptContent = (String) requestBody.get("prompt_content");
+            String description = (String) requestBody.getOrDefault("description", existing.getOrDefault("description", ""));
+            String category = (String) requestBody.getOrDefault("category", existing.getOrDefault("category", "custom"));
+            String agentType = (String) requestBody.getOrDefault("agent_type", existing.getOrDefault("agent_type", ""));
+            List<String> tags = (List<String>) requestBody.getOrDefault("tags", existing.getOrDefault("tags", new ArrayList<>()));
+            Boolean isActive = (Boolean) requestBody.getOrDefault("is_active", existing.getOrDefault("is_active", true));
+
+            // Check if there are changes
+            boolean hasChanges = promptContent != null && !promptContent.equals(existing.get("prompt_content"));
+
+            if (!hasChanges) {
+                Map<String, Object> responseData = Map.of(
+                        "success", false,
+                        "message", "No changes detected; update the prompt before saving.",
+                        "data", Map.of("prompt_key", promptKey)
+                );
+                sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
+                return;
+            }
+
+            // Update prompt
+            boolean success = promptManager.savePrompt(promptKey, promptContent, description, category, agentType,
+                    1, isActive, tags, (String) existing.getOrDefault("created_by", "user"));
+
+            if (!success) {
+                sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                        WebResponse.error(500, "Failed to update prompt").toMap());
+                return;
+            }
+
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully updated prompt",
+                    "data", Map.of("prompt_key", promptKey)
+            );
+
+            sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
+        } catch (Exception e) {
+            log.error("Update prompt failed: " + promptKey, e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to update prompt: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Delete prompt
+     */
+    private void deletePrompt(String promptKey, HttpServletResponse response) throws IOException {
+        try {
+            boolean success = promptManager.deletePrompt(promptKey);
+
+            if (!success) {
+                sendJsonResponse(response, HttpServletResponse.SC_NOT_FOUND,
+                        WebResponse.error(404, "Prompt not found").toMap());
+                return;
+            }
+
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully deleted prompt",
+                    "data", Map.of("prompt_key", promptKey)
+            );
+
+            sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
+        } catch (Exception e) {
+            log.error("Delete prompt failed: " + promptKey, e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to delete prompt: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get prompt version history
+     */
+    private void getPromptHistory(String promptKey, HttpServletResponse response) throws IOException {
+        try {
+            List<Map<String, Object>> history = promptManager.getPromptHistory(promptKey);
+
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully retrieved prompt history",
+                    "data", history
+            );
+
+            sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
+        } catch (Exception e) {
+            log.error("Get prompt history failed: " + promptKey, e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to get prompt history: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Revert prompt to specific version
+     */
+    private void revertPromptToVersion(String promptKey, int targetVersion, HttpServletResponse response) throws IOException {
+        try {
+            // Check if prompt exists
+            Map<String, Object> existing = promptManager.getPrompt(promptKey, false);
+            if (existing == null) {
+                sendJsonResponse(response, HttpServletResponse.SC_NOT_FOUND,
+                        WebResponse.error(404, "Prompt not found").toMap());
+                return;
+            }
+
+            // Revert to target version
+            boolean success = promptManager.revertToVersion(promptKey, targetVersion);
+
+            if (!success) {
+                sendJsonResponse(response, HttpServletResponse.SC_BAD_REQUEST,
+                        WebResponse.error(400, "Failed to revert to version " + targetVersion).toMap());
+                return;
+            }
+
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully reverted " + promptKey + " to version " + targetVersion,
+                    "data", Map.of(
+                            "prompt_key", promptKey,
+                            "reverted_to_version", targetVersion,
+                            "revert_time", LocalDateTime.now().format(DATE_TIME_FORMATTER)
+                    )
+            );
+
+            sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
+        } catch (Exception e) {
+            log.error("Revert prompt failed: " + promptKey + ", version: " + targetVersion, e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to revert prompt: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get specific version of a prompt
+     */
+    private void getPromptVersion(String promptKey, int version, HttpServletResponse response) throws IOException {
+        try {
+            // Get version history
+            List<Map<String, Object>> history = promptManager.getPromptHistory(promptKey);
+
+            // Find the specific version
+            Map<String, Object> targetVersion = null;
+            for (Map<String, Object> hist : history) {
+                if (Integer.parseInt(hist.get("version").toString()) == version) {
+                    targetVersion = hist;
+                    break;
+                }
+            }
+
+            if (targetVersion == null) {
+                sendJsonResponse(response, HttpServletResponse.SC_NOT_FOUND,
+                        WebResponse.error(404, "Version " + version + " not found for prompt " + promptKey).toMap());
+                return;
+            }
+
+            Map<String, Object> responseData = Map.of(
+                    "success", true,
+                    "message", "Successfully retrieved version " + version + " of prompt " + promptKey,
+                    "data", targetVersion
+            );
+
+            sendJsonResponse(response, HttpServletResponse.SC_OK, responseData);
+        } catch (Exception e) {
+            log.error("Get prompt version failed: " + promptKey + ", version: " + version, e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to get prompt version: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get detailed agent information for frontend display.
+     * @param request
+     * @param response
+     * @throws IOException
+     */
+    private void getAgents(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        try {
+            // Extract agent information from MAS
+            List<Map<String, Object>> agents = new ArrayList<>();
+
+            // Get agents from oxy_name_to_oxy registry
+            for (Map.Entry<String, BaseOxy> entry : mas.getOxyNameToOxy().entrySet()) {
+                String agentName = entry.getValue().getName();
+                BaseOxy oxyInstance = entry.getValue();
+
+                Map<String, Object> agentInfo = new HashMap<>();
+                agentInfo.put("name", agentName);
+                agentInfo.put("desc", "");
+                agentInfo.put("type", "agent");
+                agentInfo.put("class_name", oxyInstance.getClass().getSimpleName());
+                agentInfo.put("path", List.of(agentName));
+
+                agents.add(agentInfo);
+            }
+
+            Map<String, Object> data = Map.of("agents", agents);
+            sendJsonResponse(response, HttpServletResponse.SC_OK,
+                    WebResponse.success(data).toMap());
+
+//            sendSseEvent(response, "message", Map.of("agents", mas.getAgentOrganization()));
+        } catch (Exception e) {
+            log.error("Get agents failed", e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to get agents: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Create or update conversation rating
+     */
+    private void rating(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        try {
+            Map<String, Object> payload = readRequestBody(request);
+            RatingRequest ratingRequest = new RatingRequest((String) payload.get("trace_id"), RatingType.valueOf(((String) payload.get("rating_type")).toUpperCase()), (String) payload.get("comment"), (String) payload.get("erp"));
+            RatingResponse result = evaluationManager.createRating(ratingRequest, request, null);
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("rating_id", result.getRatingId());
+            if (result.getCurrentStats() != null) {
+                data.put("stats", result.getCurrentStats().toMap());
+            }
+
+            if (result.isSuccess()) {
+                sendJsonResponse(response, HttpServletResponse.SC_OK,
+                        WebResponse.success(data).toMap());
+            } else {
+                sendJsonResponse(response, HttpServletResponse.SC_BAD_REQUEST,
+                        WebResponse.error(400, result.getMessage()).toMap());
+            }
+        } catch (Exception e) {
+            log.error("Create rating error", e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Rating operation failed: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get rating statistics for a specific conversation
+     */
+    private void getRatingStats(String traceId, HttpServletResponse response) throws IOException {
+        try {
+            Optional<RatingStats> stats = evaluationManager.getRatingStats(traceId);
+            if (stats.isPresent()) {
+                sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(stats.get()).toMap());
+            } else {
+                Map<String, Object> data = new HashMap<>();
+                data.put("trace_id", traceId);
+                data.put("like_count", 0);
+                data.put("dislike_count", 0);
+                data.put("total_ratings", 0);
+                data.put("satisfaction_rate", 0.0);
+                sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(stats, "No rating data available").toMap());
+            }
+        } catch (Exception e) {
+            log.error("Get rating stats failed: " + traceId, e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to get rating statistics: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get current rating record for a specific conversation
+     */
+    private void getCurrentRating(String traceId, String erp, HttpServletResponse response) throws IOException {
+        try {
+            List<ConversationRating> ratings = evaluationManager.getRatingHistory(traceId, Optional.of(erp));
+            ConversationRating currentRating = ratings.isEmpty() ? null : ratings.get(0);
+            Map<String, Object> data = new HashMap<>();
+            data.put("trace_id", traceId);
+            if (currentRating != null) {
+                data.put("current_rating", currentRating.toMap());
+            } else {
+                data.put("current_rating", null);
+            }
+            sendJsonResponse(response, HttpServletResponse.SC_OK,
+                    WebResponse.success(data).toMap());
+        } catch (Exception e) {
+            log.error("Get current rating failed: " + traceId, e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to get current rating: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get all rating history records for a specific conversation
+     */
+    private void getRatingHistory(String traceId, String erp, HttpServletResponse response) throws IOException {
+        try {
+            List<ConversationRating> history = evaluationManager.getRatingHistory(traceId, Optional.of(erp));
+            List<Map<String, Object>> ratingsData = history.stream()
+                    .map(ConversationRating::toMap)
+                    .collect(Collectors.toList());
+            Map<String, Object> data = new HashMap<>();
+            data.put("trace_id", traceId);
+            data.put("ratings", ratingsData);
+            data.put("count", ratingsData.size());
+            data.put("erp_filter", erp);
+            sendJsonResponse(response, HttpServletResponse.SC_OK,
+                    WebResponse.success(data).toMap());
+        } catch (Exception e) {
+            log.error("Get rating history failed: " + traceId, e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to get rating history: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Clear all rating data
+     */
+    private void clearAllRatingData(HttpServletResponse response) throws IOException {
+        try {
+            Map<String, Object> result = evaluationManager.clearAllRatingData();
+            sendJsonResponse(response, HttpServletResponse.SC_OK,
+                    WebResponse.success(result).toMap());
+        } catch (Exception e) {
+            log.error("Clear all rating data failed", e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to clear rating data: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Setup rating-related indexes
+     */
+    private void setupRatingIndices(HttpServletResponse response) throws IOException {
+        try {
+            Map<String, Object> result = evaluationManager.ensureRatingIndicesWithCorrectMapping();
+            if ((Boolean) result.get("success")) {
+                List<String> createdIndices = new ArrayList<>();
+                if ((Boolean) result.get("rating_index_created")) {
+                    createdIndices.add("rating index");
+                }
+                if ((Boolean) result.get("rating_stats_index_created")) {
+                    createdIndices.add("rating stats index");
+                }
+                String message;
+                if (!createdIndices.isEmpty()) {
+                    message = "Successfully created indexes: " + String.join(", ", createdIndices);
+                } else {
+                    message = "All indexes already exist, no creation needed";
+                }
+                sendJsonResponse(response, HttpServletResponse.SC_OK,
+                        WebResponse.success(result).toMap());
+            } else {
+                sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                        WebResponse.error(500, "Failed to setup indexes, errors: " + result.get("errors")).toMap());
+            }
+        } catch (Exception e) {
+            log.error("Setup rating indices failed", e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to setup indexes: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Rebuild rating statistics for specific conversation
+     */
+    private void rebuildRatingStats(String traceId, HttpServletResponse response) throws IOException {
+        try {
+            RatingStats stats = evaluationManager.updateRatingStats(traceId, null);
+
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("trace_id", traceId);
+            responseData.put("rebuilt_stats", stats);
+            responseData.put("message", "Statistics recalculated");
+
+            sendJsonResponse(response, HttpServletResponse.SC_OK,
+                    WebResponse.success(responseData).toMap());
+        } catch (Exception e) {
+            log.error("Rebuild rating stats failed: " + traceId, e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to rebuild statistics: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Delete specified rating record
+     */
+    private void deleteRating(String ratingId, HttpServletResponse response) throws IOException {
+        try {
+            boolean success = evaluationManager.deleteRating(ratingId);
+            Map<String, Object> responseData = new HashMap<>();
+            responseData.put("deleted", success);
+            responseData.put("rating_id", ratingId);
+
+            sendJsonResponse(response, HttpServletResponse.SC_OK,
+                    WebResponse.success(responseData).toMap());
+        } catch (Exception e) {
+            log.error("Delete rating failed: " + ratingId, e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to delete rating: " + e.getMessage()).toMap());
+        }
+    }
+
+
+    /**
+     * Get conversation history with ratings.
+     * @return WebResponse with conversation groups
+     */
+    private void historyWithRatings(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        try {
+            int page = Integer.parseInt(CommonUtils.getOrDefault(request.getParameter("page"), "1"));
+            int pageSize = Integer.parseInt(CommonUtils.getOrDefault(request.getParameter("page_size"), "20"));
+            String ratingFilter = CommonUtils.getOrDefault(request.getParameter("rating_filter"), "all");
+            String searchTerm = CommonUtils.getOrDefault(request.getParameter("search_term"), "");
+
+            Map<String, Object> responseData = evaluationManager.historyWithRatings(ratingFilter, searchTerm, page, pageSize);
+            sendJsonResponse(response, HttpServletResponse.SC_OK, WebResponse.success(responseData).toMap());
+        } catch (Exception e) {
+            log.error("Get history with ratings failed", e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to get conversation history: " + e.getMessage()).toMap());
+        }
+    }
+
+    /**
+     * Get rating statistics and analysis data
+     */
+    private void analyticsRatings(HttpServletRequest request, HttpServletResponse response) throws IOException {
+        try {
+            int days = Integer.parseInt(CommonUtils.getOrDefault(request.getParameter("days"), "7"));
+            Map<String, Object> stats = evaluationManager.getOverallRatingStats(days);
+            sendJsonResponse(response, HttpServletResponse.SC_OK,
+                    WebResponse.success(stats).toMap());
+        } catch (Exception e) {
+            log.error("Get rating analytics failed", e);
+            sendJsonResponse(response, HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+                    WebResponse.error(500, "Failed to get rating analytics: " + e.getMessage()).toMap());
+        }
+    }
+
 }

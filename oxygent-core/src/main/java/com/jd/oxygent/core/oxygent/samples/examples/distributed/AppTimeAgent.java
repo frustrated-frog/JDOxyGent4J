@@ -44,7 +44,7 @@ public class AppTimeAgent {
                 ReActAgent.builder()
                         .name("time_agent")
                         .desc("A tool for time query")
-                        .tools(Arrays.asList("time_tools")) // 工具名列表
+                        .tools(Arrays.asList("time_tools")) // List of tool names
                         .build()
         );
     }

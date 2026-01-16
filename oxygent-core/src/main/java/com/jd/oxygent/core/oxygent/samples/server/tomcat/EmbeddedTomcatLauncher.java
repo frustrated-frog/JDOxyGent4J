@@ -2,8 +2,10 @@ package com.jd.oxygent.core.oxygent.samples.server.tomcat;
 
 import com.jd.oxygent.core.oxygent.samples.server.LauncherLifecycle;
 import com.jd.oxygent.core.oxygent.samples.server.ServerConstants;
+import com.jd.oxygent.core.oxygent.samples.server.filter.CharacterEncodingFilter;
 import com.jd.oxygent.core.oxygent.samples.server.filter.MimeTypeFilter;
 import com.jd.oxygent.core.oxygent.samples.server.filter.RouteFilter;
+import com.jd.oxygent.core.oxygent.samples.server.scanner.ApiEndpointScanner;
 import jakarta.servlet.ServletException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.catalina.Context;
@@ -210,6 +212,21 @@ public class EmbeddedTomcatLauncher implements LauncherLifecycle {
 
             context.addChild(servletWrapper);
             ServerConstants.ROUTE_MAPPING.forEach(context::addServletMappingDecoded);
+
+            // Add Annotation RouteServlet
+            Wrapper annotationServletWrapper = context.createWrapper();
+            annotationServletWrapper.setName("AnnotationApiServlet");
+            annotationServletWrapper.setServletClass("com.jd.oxygent.core.oxygent.samples.server.servlet.AnnotationApiServlet");
+            annotationServletWrapper.setLoadOnStartup(2);
+
+            context.addChild(annotationServletWrapper);
+            context.addServletMappingDecoded("/api/*", "AnnotationApiServlet");
+
+            log.info("AnnotationApiServlet configuration completed");
+
+            // Initialize endpoint scanning (you can specify the package to scan here)
+        ApiEndpointScanner.scan(DEFAULT_API_ENDPOINT_SCANNER_PATH);
+
             log.info("RouteServlet configuration completed");
         } catch (Exception e) {
             log.error("Failed to configure Servlets", e);
@@ -243,6 +260,18 @@ public class EmbeddedTomcatLauncher implements LauncherLifecycle {
         mimeTypefilterMap.setFilterName("mimeTypeFilter");
         mimeTypefilterMap.addURLPattern("/image/*");
         context.addFilterMap(mimeTypefilterMap);
+
+        // Add CharacterEncodingFilter
+        FilterDef characterEncodingFilterDef = new FilterDef();
+        characterEncodingFilterDef.setFilterName("characterEncodingFilter");
+        characterEncodingFilterDef.setFilterClass(CharacterEncodingFilter.class.getName());
+        context.addFilterDef(characterEncodingFilterDef);
+
+        // Map Filter to all requests
+        FilterMap characterEncodingFilterMap = new FilterMap();
+        characterEncodingFilterMap.setFilterName("characterEncodingFilter");
+        characterEncodingFilterMap.addURLPattern("/*");
+        context.addFilterMap(characterEncodingFilterMap);
     }
 
     /**

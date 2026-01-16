@@ -161,6 +161,18 @@ public interface BaseEs {
     Boolean exists(String indexName, String docId);
 
     /**
+     * Delete Elasticsearch document
+     * <p>
+     * Delete specified document from index.
+     *
+     * @param indexName Index name, cannot be null or empty string
+     * @param docId     Document ID, cannot be null or empty string
+     * @return Delete operation result, including acknowledged and other status information
+     * @throws IllegalArgumentException When parameters are invalid
+     */
+    Map<String, Object> delete(String indexName, String docId);
+
+    /**
      * Close ES client connection
      * <p>
      * Safely close ES client connections and release related resources including connection pools,
@@ -177,4 +189,7 @@ public interface BaseEs {
      */
     void close();
 
+    Map<String, Object> deleteIndex(String indexName);
+
+    Map<String, Object> refreshIndex(String indexName);
 }

@@ -1,36 +1,31 @@
 <!DOCTYPE html>
-<!--
- * @author OxyGent Team
- * @version 1.0.0
- * @since 1.0.0
- -->
 <html>
 <head>
     <meta charset="utf-8">
-    <!-- Force no-cache meta tags -->
+    <!-- 强制不缓存的 meta 标签 -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <link rel="shortcut icon" href="image/group-favicon.png" type="image/x-icon">
+    <link rel="shortcut icon" href="./image/group-favicon.png" type="image/x-icon">
     <title>OxyGent App</title>
-    <link rel="stylesheet" href="css/style.css?time=2">
-    <link rel="stylesheet" href="css/main.css?time=2"/>
-    <link rel="stylesheet" href="css/tree.css?time=2"/>
-    <link rel="stylesheet" href="css/cascader.css?time=2"/>
-    <link rel="stylesheet" href="css/file.css?time=2"/>
-    <link rel="stylesheet" href="css/agent-list.css?time=2"/>
+    <link rel="stylesheet" href="./css/style.css?time=2">
+    <link rel="stylesheet" href="./css/main.css?time=2"/>
+    <link rel="stylesheet" href="./css/tree.css?time=2"/>
+    <link rel="stylesheet" href="./css/cascader.css?time=2"/>
+    <link rel="stylesheet" href="./css/file.css?time=2"/>
+    <link rel="stylesheet" href="./css/agent-list.css?time=2"/>
     <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
-    <script src="js/utils.js?time=2"></script>
-    <script src="js/marked.min.js?time=2"></script>
-    <script src="js/agent_tree.js?time=2"></script>
-    <script src="js/cascader.js?time=2"></script>
-    <script src="js/upload.js?time=2"></script>
-    <script src="js/message.js?time=2"></script>
+    <script src="./js/utils.js?time=2"></script>
+    <script src="./js/marked.min.js?time=2"></script>
+    <script src="./js/agent_tree.js?time=2"></script>
+    <script src="./js/cascader.js?time=2"></script>
+    <script src="./js/upload.js?time=2"></script>
+    <script src="./js/message.js?time=2"></script>
 </head>
 <body>
 <div class="header">
     <div class="header-left">
-        <img class="header-left-img" src="image/group-favicon.png" alt="">
+        <img class="header-left-img" src="./image/group-favicon.png" alt="">
         <!--        <div class="operate">-->
         <!--            <button onclick="save_historys()">save</button>-->
         <!--            <div class="nice-select">-->
@@ -53,27 +48,35 @@
     </div>
     <div id="header_title_id" class="header-title"></div>
     <div class="header-right">
+        <button class="btn-history" onclick="window.open('history.html', '_blank')" title="Conversation History">
+            <img src="./image/history.svg" alt="History"/>
+            History
+        </button>
+        <button class="btn-history" onclick="window.open('prompts.html', '_blank')" title="Prompt Management">
+            <img src="./image/prompt.svg" alt="Prompts"/>
+            Prompts
+        </button>
         <div class="control">
             <button onclick="begin()">
-                <img src="image/arrow-left-double.svg" alt=""/>
+                <img src="./image/arrow-left-double.svg" alt=""/>
             </button>
             <button onclick="back()">
-                <img src="image/arrow-left.svg" alt=""/>
+                <img src="./image/arrow-left.svg" alt=""/>
             </button>
 
             <button data-status="play" id="play" onclick="play()">
-                <img src="image/play.svg" alt=""/>
+                <img src="./image/play.svg" alt=""/>
             </button>
 
             <button onclick="next()">
-                <img src="image/arrow-right.svg" alt=""/>
+                <img src="./image/arrow-right.svg" alt=""/>
             </button>
             <button onclick="end()">
-                <img src="image/arrow-right-double.svg" alt=""/>
+                <img src="./image/arrow-right-double.svg" alt=""/>
             </button>
             <div id="step"></div>
         </div>
-        <!--        todo  Language/Theme toggle-->
+        <!--        todo  中英文  主题-->
         <!--                <div class="global-buttons">-->
         <!--                    <button class="btn-theme">-->
         <!--                        <img src="./image/global-language.svg" alt="">-->
@@ -95,7 +98,7 @@
                 </div>
                 <div class="chat_toggle_group">
                     <button id="message_group" onclick="openRight()">
-                        <img src="image/group-vector-default.svg" alt=""/>
+                        <img src="./image/group-vector-default.svg" alt=""/>
                     </button>
                 </div>
             </div>
@@ -148,14 +151,14 @@
                         accept=".txt,.jpg,.jpeg,.png,.mp4,.xlsx,.xls,.doc,.docx,.pdf,.csv,.tsv,.ods,.py,.md,.json"
                         style="display: none;"
                     >
-                    <img src="image/group_addtion.svg" alt=""/>
+                    <img src="./image/group_addtion.svg" alt=""/>
                     <span class="file-tooltip">
                         <span class="file-tooltip-title"> Upload attachments </span>
                         <span class="file-tooltip-description">Max 10, 10MB each. Images, videos and table files are supported.</span>
                     </span>
                 </button>
                 <button id="message_send" onclick="send_message()">
-                    <img src="image/up_arrow.svg" alt=""/>
+                    <img src="./image/up_arrow.svg" alt=""/>
                 </button>
             </div>
         </div>
@@ -165,11 +168,11 @@
         <div class="right-container">
             <div id="agent_log">
                 <div class="agent-empty">
-                    <img class="empty-img" src="image/empty.svg" alt="">
+                    <img class="empty-img" src="./image/empty.svg" alt="">
                 </div>
             </div>
                 <button id="agent_log_close_id" onclick="closeRight()">
-                    <img src="image/group_close.svg" alt=""/>
+                    <img src="./image/group_close.svg" alt=""/>
                 </button>
         </div>
 
@@ -191,6 +194,9 @@
     var show_id = 0;
     var agent_id_dict = {};
     var agent_organization = {};
+    var current_streaming_agent = null; // 当前正在流式输出的agent名称（向后兼容）
+    var current_streaming_element = null; // 当前正在流式输出的DOM元素（向后兼容）
+    var streaming_elements_map = {}; // 存储不同node_id对应的流式输出元素 {node_id: {agent, element}}
 
     var master_agent_name = "master_agent";
     var div_right = $("#agent_log");
@@ -224,20 +230,20 @@
         {bgColor: '#FFE4E8', color: '#800013', imgUrl: './image/agents/agent_15.png'},
     ];
 
-    // File upload information for chat interface
+    // 聊天界面的文件上传信息
     var filesToUpload = [];
 
     var argentName = '';
 
     (function () {
-    // Use sessionStorage to avoid refresh infinite loop
+    // 使用 sessionStorage 避免刷新死循环
     if (!sessionStorage.getItem('page_refreshed')) {
         sessionStorage.setItem('page_refreshed', '1');
 
-        /* Add timestamp parameter to current URL to trigger browser to fetch latest resources from server */
+        /* 为当前 URL 加上时间戳参数，触发浏览器向服务器重新拉取最新资源 */
         const url = new URL(location.href);
         url.searchParams.set('_', Date.now());
-        location.replace(url.toString());          // Force reload once
+        location.replace(url.toString());          // 强制重新加载一次
     }
     })();
 
@@ -367,7 +373,7 @@
                 // console.log('first_query', response);
                 $("#message_input").val(response.data.first_query);
                 if (response.data.first_query) {
-                    $("#message_send").addClass('message_send_active'); // Blue background when has value
+                    $("#message_send").addClass('message_send_active'); // 有值时背景色为蓝色
                 }
 
             }
@@ -381,10 +387,10 @@
         $('#message_input').on('input', function () {
             const val = $(this).val();
             if (val) {
-                $("#message_send").addClass('message_send_active'); // Blue background when has value
+                $("#message_send").addClass('message_send_active'); // 有值时背景色为蓝色
                 if (val.indexOf('@') > -1) {
                     // console.log('@val', val)
-                    // Remove @ from current input while keeping other input items, only delete @ character
+                    // 把当前的输入@删除保留其他的输入项，只删除@这个字符
                     const inputVal = val.replace('@', '');
                     $('#message_input').val(inputVal);
 
@@ -392,7 +398,7 @@
                     var distanceFromBottom = $(window).height() - ($element.offset().top + $element.outerHeight());
                     var distanceFromLeft = $element.offset().left;
                     const marginLeftValue = getTextWidth(inputVal);
-                    // Show chat list
+                    // 显示chat list
                     $('#chat-at-list-container-id').css({
                         bottom: (distanceFromBottom + 70) + 'px',
                         left: (distanceFromLeft + marginLeftValue) + 'px',
@@ -402,7 +408,7 @@
                 }
             } else {
                 if($("#message_send").hasClass('message_send_active')) {
-                    $("#message_send").removeClass('message_send_active'); // White background when no value
+                    $("#message_send").removeClass('message_send_active'); // 无值时背景色为白色
                 }
             }
         });
@@ -435,7 +441,7 @@
     });
 
     function renderHeaderTitle(id) {
-        // Generate one if empty
+        // 如果为空生成一个
         if (!id) {
             now_script_id = generateScriptId();
         }
@@ -443,25 +449,25 @@
     }
 
     function add_tool_call(arr) {
-        tool_calls.push([...arr]); // Store in new array, deep copy
+        tool_calls.push([...arr]); // 存入新数组，深拷贝
     }
 
-    // Delete a specific array (delete based on array content)
+    // 删除某个数组（根据数组内容删除）
     function remove_tool_call(arr) {
-        // Find the index of array with exactly the same content as arr
+        // 找到和arr内容完全一样的数组的索引
         const index = tool_calls.findIndex(item =>
             item.length === arr.length && item.every((v, i) => v === arr[i])
         );
         if (index !== -1) {
             tool_calls.splice(index, 1);
-            return true; // Delete successful
+            return true; // 删除成功
         }
-        return false; // Not found
+        return false; // 没找到
     }
 
-    // View all current arrays
+    // 查看当前所有数组
     function get_all_tool_calls() {
-        return tool_calls.map(arr => [...arr]); // Return copy to prevent external modification
+        return tool_calls.map(arr => [...arr]); // 返回拷贝，防止外部修改
     }
 
     function getNodeColors(tool_calls) {
@@ -476,7 +482,7 @@
                 const nodeKey = encodeList(current);
 
                 if (!(nodeKey in nodeColors)) {
-                    nodeColors[nodeKey] = 'red'; // Default leaf
+                    nodeColors[nodeKey] = 'red'; // 默认叶子
                 }
                 if (parent.length > 0) {
                     childrenSet.add(encodeList(parent));
@@ -493,7 +499,7 @@
 
     function diffNodeColors(node_state, new_node_state) {
         const result = {};
-        // All involved nodes
+        // 所有涉及到的节点
         const allNodes = new Set([
             ...Object.keys(node_state),
             ...Object.keys(new_node_state)
@@ -504,15 +510,15 @@
             const newColor = new_node_state[node];
 
             if (newColor === undefined) {
-                // New state doesn't have this node, and it was red or yellow before, needs to become white
+                // 新状态没有这个节点，且之前是红或黄，需要变成白色
                 if (oldColor === 'red' || oldColor === 'yellow') {
                     result[node] = 'white';
                 }
             } else if (oldColor !== newColor) {
-                // Color changed
+                // 颜色发生变化
                 result[node] = newColor;
             }
-            // Same color, no output
+            // 颜色相同，不输出
         });
 
         return result;
@@ -543,11 +549,18 @@
 
     function message_handler(message) {
         // console.log(message)
-        if (message.startsWith("Server")) {
+        if (message.startsWith("服务器")) {
             console.log(message);
             return;
         }
         let jm = JSON.parse(message);
+        
+        // 处理流式输出消息
+        if (jm["type"] === "stream") {
+            handle_stream_message(jm);
+            return;
+        }
+        
         if (!["tool_call", "observation"].includes(jm["type"])) {
             return;
         }
@@ -565,7 +578,7 @@
                 history["agent_log"] = JSON.parse(JSON.stringify(plan_dict[jm["content"]["callee"]]));
             }
 
-            if (jm["content"]["callee_category"] === 'agent' || jm["content"]["callee_category"] === 'tool') {
+            if (jm["content"]["callee_category"] === 'agent' || jm["content"]["callee_category"] === 'tool' || jm["content"]["callee_category"] === 'bank') {
                 add_tool_call(jm["content"]["call_stack"].slice(1));
                 history["tool_call"] = getNodeColors(get_all_tool_calls());
             }
@@ -579,7 +592,11 @@
                 chats.push(msg);
                 history["answer"] = JSON.parse(JSON.stringify(chats));
             } else if (jm["content"]["caller_category"] === 'agent' && jm["content"]["callee_category"] === 'llm') {
-                // Start calling llm
+                // 开始调用llm，准备流式输出
+                current_streaming_agent = jm["content"]["caller"];
+                var node_id = jm["content"]["node_id"];
+                // 创建流式输出的消息元素
+                create_streaming_message_element(current_streaming_agent, node_id);
                 return;
             }
         }
@@ -588,17 +605,51 @@
             if (jm["content"]["caller"] === 'user') {
                 // answer
                 from_trace_id = jm["content"]["current_trace_id"];
+                var trace_id = jm["content"]["current_trace_id"] || jm["content"]["trace_id"];
                 var markdownInput = jm["content"]["output"];
                 if (typeof markdownInput !== 'string') {
                     markdownInput = JSON.stringify(markdownInput, null, 2);
                 }
-                var msg = {"role": jm["content"].callee, "content": markdownInput};
+                // 如果存在流式输出元素，使用流式输出的内容（可能更完整）
+                // 查找对应的流式输出元素（优先使用node_id，否则使用agent名称）
+                var node_id = jm["content"]["node_id"];
+                var agent_name = jm["content"]["callee"];
+                var key = node_id || agent_name;
+                var streaming_info = streaming_elements_map[key];
+                
+                if (streaming_info && streaming_info.element) {
+                    var finalContent = streaming_info.element.text();
+                    if (finalContent) {
+                        markdownInput = finalContent;
+                    }
+                    // 移除streaming-content类并清理
+                    streaming_info.element.removeClass("streaming-content");
+                    attach_rating_ui(streaming_info.element.closest("li"), trace_id);
+                    delete streaming_elements_map[key];
+                } else if (current_streaming_element && current_streaming_agent) {
+                    // 向后兼容
+                    var finalContent = current_streaming_element.text();
+                    if (finalContent) {
+                        markdownInput = finalContent;
+                    }
+                    attach_rating_ui(current_streaming_element.closest("li"), trace_id);
+                }
+                
+                var msg = {"role": jm["content"].callee, "content": markdownInput, "trace_id": trace_id};
                 chats.push(msg);
                 history["answer"] = JSON.parse(JSON.stringify(chats));
                 llm_is_work = false;
                 // $("#message_send").text("Send");
-                // Reset react_memory
+                // 重置react_memory
                 plan_dict = {};
+                // 流式输出完成，移除streaming-content类（向后兼容）
+                if (current_streaming_element) {
+                    current_streaming_element.removeClass("streaming-content");
+                    current_streaming_element = null;
+                }
+                current_streaming_agent = null;
+                // 清理所有流式输出元素
+                streaming_elements_map = {};
             } else if (jm["content"]["caller_category"] === 'agent' && jm["content"]["callee_category"] === 'agent') {
                 push_plan(jm["content"]["caller"], "observation", jm["content"].output, jm["content"].node_id, jm["content"]["callee"]);
                 history["agent_log"] = JSON.parse(JSON.stringify(plan_dict[jm["content"]["caller"]]));
@@ -613,12 +664,27 @@
             } else if (jm["content"]["caller_category"] === 'agent' && jm["content"]["callee_category"] === 'llm') {
                 push_plan(jm["content"]["caller"], "plan", jm["content"].output, jm["content"].node_id, jm["content"]["callee"]);
                 history["agent_log"] = JSON.parse(JSON.stringify(plan_dict[jm["content"]["caller"]]));
-            } else if (jm["content"]["caller_category"] === 'agent' && ['tool'].includes(jm["content"]["callee_category"])) {
+                // 流式输出完成，移除streaming-content类
+                // 注意：planning内容不保存到chats，只保存到plan_dict
+                var node_id = jm["content"]["node_id"];
+                var key = node_id || jm["content"]["caller"];
+                var streaming_info = streaming_elements_map[key];
+                if (streaming_info && streaming_info.element) {
+                    streaming_info.element.removeClass("streaming-content");
+                    delete streaming_elements_map[key];
+                }
+                // 向后兼容
+                if (current_streaming_element) {
+                    current_streaming_element.removeClass("streaming-content");
+                    current_streaming_element = null;
+                }
+                current_streaming_agent = null;
+            } else if (jm["content"]["caller_category"] === 'agent' && ['tool', 'bank', 'memory_bank'].includes(jm["content"]["callee_category"])) {
                 push_plan(jm["content"]["caller"], "observation", jm["content"].output, jm["content"].node_id, jm["content"]["callee"]);
                 history["agent_log"] = JSON.parse(JSON.stringify(plan_dict[jm["content"]["caller"]]));
             }
 
-            if (jm["content"]["callee_category"] === 'agent' || ['tool'].includes(jm["content"]["callee_category"])) {
+            if (jm["content"]["callee_category"] === 'agent' || ['tool', 'bank', 'memory_bank'].includes(jm["content"]["callee_category"])) {
                 remove_tool_call(jm["content"]["call_stack"].slice(1));
                 history["tool_call"] = getNodeColors(get_all_tool_calls());
             }
@@ -663,6 +729,8 @@
                     tool: './image/org_tool.svg',
                     model: './image/org_model.svg',
                     flow: './image/org_flow.svg',
+                    bank: './image/org_knowledge.svg',
+                    memory_bank: './image/org_memory.svg',
                 };
                 const id = encodeList(data.path);
 
@@ -710,13 +778,279 @@
         begin();
     }
 
-    function send_msg_to_chatbox(msg, name = "user", at = "", scroll_top = true) {
+    // 创建流式输出的消息元素
+    function create_streaming_message_element(agent_name, node_id) {
+        // 如果提供了node_id，使用node_id作为key
+        var key = node_id || agent_name;
+        
+        // 检查是否已经存在流式输出元素
+        if (streaming_elements_map[key]) {
+            return streaming_elements_map[key].element;
+        }
+        
+        var li = $("<li>");
+        var li_class = "master";
+        li.addClass(li_class);
+        
+        const idx = agent_id_dict[agent_name] % 16;
+        li.append(
+            $("<img>")
+                .attr("src", agentImgMap[idx]?.imgUrl)
+                .css("background-color", agentImgMap[idx]?.bgColor)
+        );
+        li.append($("<p>").text(agent_name));
+        
+        // 创建空的span用于流式输出内容，添加streaming-content类
+        var contentSpan = $('<span class="streaming-content">');
+        li.append(contentSpan);
+        
+        div_chatbox.append(li);
+        
+        // 存储到map中
+        streaming_elements_map[key] = {
+            agent: agent_name,
+            element: contentSpan,
+            node_id: node_id
+        };
+        
+        // 向后兼容：更新全局变量
+        current_streaming_element = contentSpan;
+        current_streaming_agent = agent_name;
+        
+        scroll_top_div_chat_history();
+        return contentSpan;
+    }
+    
+    // 处理流式消息
+    function handle_stream_message(jm) {
+        var agent_name = jm["content"]["agent"];
+        var node_id = jm["content"]["node_id"];
+        var delta = jm["content"]["delta"] || "";
+        
+        if (!delta) {
+            return;
+        }
+        
+        // 如果没有agent名称，使用默认值（向后兼容）
+        if (!agent_name) {
+            agent_name = current_streaming_agent || master_agent_name;
+        }
+        
+        // 获取或创建流式输出元素
+        var key = node_id || agent_name;
+        var streaming_info = streaming_elements_map[key];
+        
+        if (!streaming_info) {
+            // 创建新的流式输出元素
+            create_streaming_message_element(agent_name, node_id);
+            streaming_info = streaming_elements_map[key];
+        }
+        
+        // 追加流式内容
+        if (streaming_info && streaming_info.element) {
+            var currentText = streaming_info.element.text();
+            streaming_info.element.text(currentText + delta);
+            scroll_top_div_chat_history();
+        }
+    }
+
+    const rating_config = {
+        endpoint: "/rating",
+        erp: "oxygent"
+    };
+
+    function submit_rating(container, rating_type, comment) {
+        var trace_id = container.data("trace-id");
+        if (!trace_id) {
+            return;
+        }
+        
+        fetch(rating_config.endpoint, {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({
+                trace_id: trace_id,
+                rating_type: rating_type,
+                comment: comment || "",
+                erp: rating_config.erp
+            })
+        })
+            .then(function (response) {
+                if (!response.ok) {
+                    throw new Error("Request failed");
+                }
+                return response.json();
+            })
+            .then(function () {
+                // Reset active states
+                container.find(".btn-icon").removeClass("active");
+                
+                // Set new active state (triggers CSS animation)
+                if (rating_type === "like") {
+                    container.find(".btn-icon.like").addClass("active");
+                } else if (rating_type === "dislike") {
+                    container.find(".btn-icon.dislike").addClass("active");
+                }
+            })
+            .catch(function (err) {
+                console.error("Rating submission error:", err);
+            });
+    }
+
+    function create_rating_container(trace_id) {
+        var container = $('<div class="message-rating-container">').data("trace-id", trace_id);
+        var actions = $('<div class="message-rating-actions">');
+
+        // Outline SVGs for Like/Dislike
+        var likeSvg = '<svg viewBox="0 0 24 24"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"></path></svg>';
+        var dislikeSvg = '<svg viewBox="0 0 24 24"><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zM17 2h3a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-3"></path></svg>';
+
+        var likeBtn = $('<button type="button" class="btn-icon like" title="Good response">' + likeSvg + '</button>');
+        var dislikeBtn = $('<button type="button" class="btn-icon dislike" title="Bad response">' + dislikeSvg + '</button>');
+
+        // Feedback Panel
+        var feedbackPanel = $('<div class="feedback-panel">');
+        var feedbackHeader = $('<div class="feedback-header"><span>What\'s the issue?</span><span class="feedback-close">&times;</span></div>');
+        
+        // Row 1: Options + Submit Button (Dynamic Slot 1)
+        var row1 = $('<div class="feedback-row-1">');
+        var feedbackOptions = $('<div class="feedback-options">');
+        row1.append(feedbackOptions);
+
+        // Row 2: Input + Submit Button (Dynamic Slot 2)
+        var row2 = $('<div class="feedback-row-2">');
+        var inputWrapper = $('<div class="feedback-input-wrapper">');
+        var customInput = $('<input type="text" class="feedback-input" placeholder="(Optional) Tell us more about your experience">');
+        inputWrapper.append(customInput);
+        row2.append(inputWrapper);
+
+        // Submit Button (Single instance moved around)
+        var submitBtn = $('<button class="feedback-submit-btn">Submit</button>');
+
+        var reasons = [
+            "Offensive/Unsafe",
+            "Factually incorrect",
+            "Not helpful",
+            "Privacy concern",
+            "Other"
+        ];
+
+        // Build Options
+        reasons.forEach(function(reason) {
+            var btn = $('<button class="feedback-option">' + reason + '</button>');
+            btn.on("click", function() {
+                $(this).toggleClass('selected');
+                updatePanelState();
+            });
+            feedbackOptions.append(btn);
+        });
+
+        function updatePanelState() {
+            var selectedTags = feedbackOptions.find('.feedback-option.selected');
+            var isOtherSelected = false;
+            var hasSelection = selectedTags.length > 0;
+
+            selectedTags.each(function() {
+                if ($(this).text() === "Other") {
+                    isOtherSelected = true;
+                }
+            });
+
+            if (!hasSelection) {
+                submitBtn.hide();
+                row2.hide(); 
+                if (submitBtn.parent().length) submitBtn.detach(); 
+            } else {
+                submitBtn.show(); 
+                submitBtn.css('display', 'block'); 
+
+                if (isOtherSelected) {
+                    // Mode 2: Show Row 2, Move button to Row 2
+                    row2.css('display', 'flex'); 
+                    row2.append(submitBtn);
+                    customInput.focus();
+                } else {
+                    // Mode 1: Hide Row 2, Move button to Row 1
+                    row2.hide();
+                    customInput.val(''); 
+                    row1.append(submitBtn);
+                }
+            }
+        }
+
+        // Close logic
+        feedbackHeader.find('.feedback-close').on('click', function() {
+            feedbackPanel.fadeOut(200);
+        });
+
+        // Submit Logic
+        submitBtn.on('click', function() {
+            var selectedReasons = [];
+            feedbackOptions.find('.feedback-option.selected').each(function() {
+                selectedReasons.push($(this).text());
+            });
+            
+            var comment = customInput.val().trim();
+            
+            var finalReason = selectedReasons.join(", ");
+            if (comment) {
+                if (finalReason) {
+                    finalReason += " | Details: " + comment;
+                } else {
+                    finalReason = comment;
+                }
+            }
+            
+            submit_rating(container, "dislike", finalReason || "Unspecified feedback");
+            feedbackPanel.fadeOut(200);
+        });
+
+        feedbackPanel.append(feedbackHeader, row1, row2);
+
+        // Button Actions
+        likeBtn.on("click", function () {
+            // Close feedback panel if open
+            feedbackPanel.hide();
+            // Submit Like
+            submit_rating(container, "like", "");
+        });
+
+        dislikeBtn.on("click", function () {
+            // Toggle Feedback Panel
+            if (feedbackPanel.is(':visible')) {
+                feedbackPanel.fadeOut(200);
+            } else {
+                feedbackPanel.fadeIn(200);
+                // Reset state
+                feedbackOptions.find('.feedback-option').removeClass('selected');
+                submitBtn.hide();
+                row2.hide();
+                customInput.val('');
+            }
+        });
+
+        actions.append(likeBtn, dislikeBtn);
+        container.append(actions, feedbackPanel);
+        return container;
+    }
+
+    function attach_rating_ui(li, trace_id) {
+        if (!trace_id || !li || li.length === 0) {
+            return;
+        }
+        if (li.find(".message-rating-container").length > 0) {
+            return;
+        }
+        li.append(create_rating_container(trace_id));
+    }
+
+    function send_msg_to_chatbox(msg, name = "user", at = "", scroll_top = true, trace_id = "") {
         var li = $("<li>");
         if (name === "user") {
             li.addClass("me");
             li.append(`
                     <span class="user-img">
-                        <img src="image/user.svg" />
+                        <img src="./image/user.svg" />
                     </span>
                 `);
         } else {
@@ -747,6 +1081,10 @@
             li.append($('<span>').append($("<section>").css("color", agentImgMap[agent_id_dict[at]]?.color).text("@" + at)).append(msg));
         }
 
+        if (name === master_agent_name && at === "") {
+            attach_rating_ui(li, trace_id);
+        }
+
         if (name === "user" && filesToUpload.length > 0) {
             var fileList = document.createElement('div');
             fileList.className = 'file-list-chat';
@@ -755,7 +1093,7 @@
                 fileItem.className = 'file-item';
                 fileItem.innerHTML = `
                             <div class="file-icon">
-                                <img src="image/video.svg" alt=""></img>
+                                <img src="./image/video.svg" alt=""></img>
                             </div>
                             <div class="file-info">
                                 <div class="file-name">${_file.name}</div>
@@ -764,7 +1102,7 @@
                 fileList.append(fileItem);
             })
             li.append(fileList);
-            // Clear input box
+            // 清空输入框
             fileReset()
         }
         div_chatbox.append(li);
@@ -801,15 +1139,15 @@
             let query_val = message;
             try {
                 const parsed = JSON.parse(message.trim());
-                // If it's an object/array containing "part" field, consider it as A2A format
+                // 若为对象 / 数组且包含 "part" 字段，则认为是 A2A 格式
                 if (
                     (Array.isArray(parsed) && parsed[0]?.part) ||
                     (parsed && parsed.part)
                 ) {
-                    query_val = parsed;   // Structured query
+                    query_val = parsed;   // 结构化 query
                 }
             } catch (e) {
-                /* Not valid JSON ⇒ maintain plain text */
+                /* 不是合法 JSON ⇒ 维持纯文本 */
             }
 
             var payload = {
@@ -826,9 +1164,9 @@
                 payload.callee = argentName;
             }
 
-            // TODO: Interface protocol modification
-            // if (message.includes("image")) {
-            //     payload["attachments"] = ["20250705122650_20250626090420425_copy.png"]
+            // ToDo 接口协议修改
+            // if (message.includes("图")) {
+            //     payload["attachments"] = ["20250705122650_20250626090420425_副本.png"]
             // }
             eventSource = new EventSource('../sse/chat?payload=' + encodeURIComponent(JSON.stringify(payload)));
             // eventSource = new EventSource('../sse/chat?query='+message+'&from_trace_id='+from_trace_id);
@@ -847,20 +1185,20 @@
             //     }
             // }, 1000);
             eventSource.onerror = (e) => {
-                console.log('SSE connection error occurred', e);
+                console.log('SSE 连接发生错误', e);
                 $("#message_send").html(`
-                    <img src="image/up_arrow.svg" alt="" />
+                    <img src="./image/up_arrow.svg" alt="" />
                 `);
                 eventSource.close();
             };
             eventSource.addEventListener("close", (event) => {
-                console.log("Task completed, closing SSE connection:", event.data);
+                console.log("任务完成，关闭SSE连接:", event.data);
                 $("#message_send").html(`
-                    <img src="image/up_arrow.svg" alt="" />
+                    <img src="./image/up_arrow.svg" alt="" />
                 `);
-                eventSource.close(); // Actively close connection
+                eventSource.close(); // 主动关闭连接
             });
-            // ws.send(JSON.stringify(payload));  // Send message
+            // ws.send(JSON.stringify(payload));  // 发送消息
             input.value = '';
             var msg = {"role": "user", "content": message};
             chats.push(msg);
@@ -872,20 +1210,20 @@
             send_msg_to_chatbox(message);
             llm_is_work = true;
             $("#message_send").html(`
-                    <img src="image/stop-circle.svg" alt="" />
+                    <img src="./image/stop-circle.svg" alt="" />
                 `);
         } else {
             eventSource.close();
             llm_is_work = false;
             plan_dict = {};
             $("#message_send").html(`
-                <img src="image/up_arrow.svg" alt="" />
+                <img src="./image/up_arrow.svg" alt="" />
             `);
         }
     }
 
     function show(jm) {
-        // Render
+        // 渲染
         if (jm["type"] == "answer" || jm["type"] == "agent_call") {
             var from_size = div_chatbox.children().length;
             var to_size = jm["content"].length;
@@ -898,7 +1236,7 @@
             } else if (no_change_history && from_size < to_size) {
                 // add
                 jm["content"].slice(from_size - to_size).forEach(chat => {
-                    send_msg_to_chatbox(chat.content, chat.role, chat.at, false);
+                    send_msg_to_chatbox(chat.content, chat.role, chat.at, false, chat.trace_id);
                 });
                 scroll_top_div_chat_history();
                 return;
@@ -906,7 +1244,7 @@
             no_change_history = true;
             div_chatbox.empty();
             jm["content"].forEach(chat => {
-                send_msg_to_chatbox(chat.content, chat.role, chat.at, false);
+                send_msg_to_chatbox(chat.content, chat.role, chat.at, false, chat.trace_id);
             });
             scroll_top_div_chat_history();
         }
@@ -971,7 +1309,7 @@
                                 .append($("<div class='plannings-head'>")
                                 .text(agent_log["plannings"][i].callee));
                         }
-
+                            
                         div_right
                             .append($("<div class='plannings-output-head'>")
                             .text('Output'));
@@ -998,19 +1336,17 @@
             new_node_state = jm["content"];
             var diff_color = diffNodeColors(node_state, new_node_state);
             Object.entries(diff_color).forEach(([key, value]) => {
-                if (value === 'red') { // Currently selected
+                if (value === 'red') { // 当前选中
                     $("#" + key).removeClass('pre-select');
                     $("#" + key).addClass('select');
 
                     focus_agent(key);
-                } else if (value === 'yellow') { // Previously selected
+                } else if (value === 'yellow') { // 上一个选中
                     $("#" + key).removeClass('select');
                     $("#" + key).addClass('pre-select');
 
-                } else if (value === 'white') { // Restore initial state
-                    setTimeout(() => {
-                       $("#" + key).removeClass('select');
-                    }, 300);
+                } else if (value === 'white') { // 恢复初始态
+                    $("#" + key).removeClass('select');
                     $("#" + key).removeClass('pre-select');
                 } else {
 
@@ -1020,7 +1356,7 @@
         }
     }
 
-    // Right panel collapse/expand logic
+    // 右侧面板收起展开逻辑
     $("#agent_log").on('click', function (e) {
         let current = $(e.target);
 
@@ -1057,7 +1393,7 @@
         div_right.empty();
         div_right.append(`
             <div class="agent-empty">
-                <img class="empty-img" src="image/empty.svg" alt="">
+                <img class="empty-img" src="./image/empty.svg" alt="">
             </div>
         `);
         show_step();
@@ -1078,7 +1414,7 @@
         if (status == "play") {
             if (show_id < historys.length - 1) {
                 $("#play").html(`
-                        <img src="image/pause.svg" alt="" />
+                        <img src="./image/pause.svg" alt="" />
                     `);
                 $("#play")[0].setAttribute('data-status', 'pause');
 
@@ -1090,7 +1426,7 @@
                     } else {
                         clearInterval(interval_id);
                         $("#play").html(`
-                                <img src="image/play.svg" alt="" />
+                                <img src="./image/play.svg" alt="" />
                             `);
                         $("#play")[0].setAttribute('data-status', 'play');
                     }
@@ -1099,7 +1435,7 @@
         } else {
             clearInterval(interval_id);
             $("#play").html(`
-                    <img src="image/play.svg" alt="" />
+                    <img src="./image/play.svg" alt="" />
                 `);
             $("#play")[0].setAttribute('data-status', 'play');
         }
@@ -1129,7 +1465,7 @@
         var target_div = $("#" + eid);
         var window_div = div_org;
 
-        // 1. Calculate target_div coordinates relative to window_div
+        // 1. 计算target_div相对于window_div的坐标
         var td_offset = target_div.offset() || {};
         var wd_offset = window_div.offset() || {};
 
@@ -1146,7 +1482,7 @@
             h: window_div.height()
         };
 
-        // 2. Check if it's in the visible area
+        // 2. 判断是否在可视区域
         if (
             td.y >= wd.t &&
             td.y + td.h <= wd.t + wd.h &&
@@ -1156,7 +1492,7 @@
             return;
         }
 
-        // 3. Calculate the center to scroll to
+        // 3. 计算要滚动到的中心
         var scrollTop = Math.max(0, td.y + td.h / 2 - wd.h / 2);
         var scrollLeft = Math.max(0, td.x + td.w / 2 - wd.w / 2);
 
@@ -1215,7 +1551,7 @@
     function load_historys(script_id) {
         $.ajax({
             type: "GET",
-            url: "../load_script",
+            url: "../load_script/",
             data: {
                 item_id: script_id
             },
@@ -1224,7 +1560,7 @@
                 clearInterval(interval_id);
 
                 $("#play").html(`
-                        <img src="image/play.svg" alt="" />
+                        <img src="./image/play.svg" alt="" />
                     `);
                 $("#play")[0].setAttribute('data-status', 'play');
 
@@ -1233,7 +1569,7 @@
                 no_change_history = false;
                 now_script_id = script_id;
                 renderHeaderTitle(now_script_id)
-                // Force refresh page
+                // 强制刷新页面
                 $("#message_input").val("");
                 $("#message_input").attr("placeholder", "Click here to create a new reproduce script and start a new conversation.");
                 $("#chat_send").on('click', function () {
@@ -1275,16 +1611,16 @@
         $("#step").text((show_id + 1) + " / " + historys.length);
     }
 
-    // Close the rightmost dialog
+    // 关闭最右侧对话框
     function closeRight() {
         $('#rightId').css('display', 'none');
-        $('#message_group').html('<img src="image/group-vector-active.svg" alt=""/>')
+        $('#message_group').html('<img src="./image/group-vector-active.svg" alt=""/>')
     }
 
     function openRight() {
         if ($('#rightId').css('display') == 'none') {
-            $('#message_group').html('<img src="image/group-vector-default.svg" alt=""/>')
-            $('#rightId').css('display', 'block');
+            $('#message_group').html('<img src="./image/group-vector-default.svg" alt=""/>')
+            $('#rightId').css('display', 'block');    
         }
     }
 
@@ -1333,7 +1669,7 @@
                 }
 
                 if (selectedValues[0] === 'New') {
-                    // Clear options
+                    // 清空选项
                     historys = [];
                     now_script_id = '';
                     window.location.reload();
@@ -1348,7 +1684,7 @@
                         return
                     }
                     var jsonData = JSON.stringify(historys, null, 2);
-                    // Create download link
+                    // 创建下载链接
                     var blob = new Blob([jsonData], {type: 'application/json'});
                     var url = URL.createObjectURL(blob);
                     var a = document.createElement('a');
@@ -1361,13 +1697,13 @@
                 }
 
                 if (selectedValues[0] === 'Save') {
-                    // Save content
+                    //保存内里
                     save_historys()
                     _cascader = null;
                 }
 
                 if (selectedValues[0] === 'Load') {
-                    // Load specific records
+                    //  加载具体的记录
                     const recentId = selectedValues[1];
                     // console.log(recentId);
                     if (recentId) {
@@ -1376,7 +1712,7 @@
                 }
             }
         });
-        // File input event
+        // 文件输入事件
         document.getElementById('fileInput').addEventListener('change', function (e) {
             var file = e.target.files[0];
             if (!file) return;
@@ -1389,7 +1725,7 @@
                         clearInterval(interval_id);
 
                         $("#play").html(`
-                                <img src="image/play.svg" alt="" />
+                                <img src="./image/play.svg" alt="" />
                             `);
                         $("#play")[0].setAttribute('data-status', 'play');
 
@@ -1407,15 +1743,15 @@
                         $("#message_addtional").prop("disabled", true);
 
                     } else {
-                        alert('Imported JSON data format is incorrect, must be array format');
+                        alert('导入的JSON数据格式不正确，必须是数组格式');
                     }
                 } catch (error) {
-                    alert('Failed to parse JSON file: ' + error.message);
+                    alert('解析JSON文件失败: ' + error.message);
                 }
             };
             reader.readAsText(file);
         });
-
+    
 
     function handleFileCascader(response) {
         const recentData = response.map(function (item) {
@@ -1434,7 +1770,7 @@
             return item;
         })
 
-
+        
         // 初始化级联选择器
         if (_cascader) {
             _cascader.updateOptions(options)
@@ -1495,7 +1831,7 @@
             // 检查文件类型
             var fileType = getFileType(file.name);
             if (!fileType) {
-                showStatus('Unsupported file type: ' + file.name, false);
+                showStatus('不支持的文件类型: ' + file.name, false);
                 continue;
             }
 
@@ -1570,7 +1906,7 @@
         renderFileList();
     }
 
-    // Render文件列表
+    // 渲染文件列表
     function renderFileList() {
         fileList.innerHTML = '';
 
@@ -1582,7 +1918,7 @@
             fileList.innerHTML = '';
             return;
         }
-        $("#message_send").addClass('message_send_active'); // Blue background when has value
+        $("#message_send").addClass('message_send_active'); // 有值时背景色为蓝色
         filesToUpload.forEach(function (file, index) {
             var fileItem = document.createElement('div');
             fileItem.className = 'file-item';
@@ -1593,14 +1929,14 @@
 
             fileItem.innerHTML = `
                         <div class="file-icon">
-                            <img src="image/video.svg" alt=""></img>
+                            <img src="./image/video.svg" alt=""></img>
                         </div>
                         <div class="file-info">
                             <div class="file-name">${file.name}</div>
                             <div class="file-size">${file.size}KB</div>
                         </div>
                         <div class="file-close" data-id="${file.name}">
-                            <img src="image/group_close.svg" alt="#">
+                            <img src="./image/group_close.svg" alt="#">
                         </div>
 
                     `;
@@ -1642,7 +1978,7 @@
                         <div class="chat-agent-name"><span>@</span>${argentName}</div>
                     </div>
                     <div class="chat-agent-close" onclick="chatAgentClose('${argentName}')" data-id="Group-favicon.png">
-                        <img src="image/group_close.svg" alt="#">
+                        <img src="./image/group_close.svg" alt="#">
                     </div>
                 </div>
             `;

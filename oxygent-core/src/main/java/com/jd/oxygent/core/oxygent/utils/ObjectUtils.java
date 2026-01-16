@@ -17,9 +17,24 @@ package com.jd.oxygent.core.oxygent.utils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.lang.reflect.Array;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Queue;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Object operation utility class
@@ -170,19 +185,256 @@ public class ObjectUtils {
     }
 
     /**
-     * Deep copy of Map
+     * Deep copy an object with high performance
      *
-     * @param original
-     * @return
+     * @param original The object to copy (can be null)
+     * @return A deep copy of the object, or null if original is null
      */
+    @SuppressWarnings("unchecked")
     public static <T> T deepCopy(T original) {
-        try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            String json = objectMapper.writeValueAsString(original);
-            return objectMapper.readValue(json, (Class<T>) original.getClass());
-        } catch (Exception e) {
-            e.printStackTrace();
+        if (original == null) {
             return null;
         }
+
+        // Use IdentityHashMap for fast object identity tracking
+        Map<Object, Object> copyMap = new IdentityHashMap<>();
+        return (T) deepCopyInternal(original, copyMap);
     }
+
+    /**
+     * Internal recursive deep copy method with cycle detection
+     */
+    private static Object deepCopyInternal(Object original, Map<Object, Object> copyMap) {
+        if (original == null) {
+            return null;
+        }
+
+        // Return immutable objects directly
+        if (isImmutable(original)) {
+            return original;
+        }
+
+        // Check for cycles
+        if (copyMap.containsKey(original)) {
+            return copyMap.get(original);
+        }
+
+        Class<?> clazz = original.getClass();
+
+        // Handle arrays
+        if (clazz.isArray()) {
+            return copyArray(original, copyMap);
+        }
+
+        // Handle collections
+        if (original instanceof Collection) {
+            return copyCollection((Collection<?>) original, copyMap);
+        }
+
+        // Handle maps
+        if (original instanceof Map) {
+            return copyMap((Map<?, ?>) original, copyMap);
+        }
+
+        // Handle custom objects
+        return copyObject(original, clazz, copyMap);
+    }
+
+    /**
+     * Check if an object is immutable
+     */
+    private static boolean isImmutable(Object obj) {
+        Class<?> clazz = obj.getClass();
+
+        // Primitive wrappers and String
+        if (clazz.isPrimitive() || obj instanceof String) {
+            return true;
+        }
+
+        // Number types
+        if (obj instanceof Number) {
+            return true;
+        }
+
+        // Boolean
+        if (obj instanceof Boolean) {
+            return true;
+        }
+
+        // Character
+        if (obj instanceof Character) {
+            return true;
+        }
+
+        // Enum types
+        if (obj instanceof Enum) {
+            return true;
+        }
+
+        // Java 8+ time types
+        if (obj instanceof java.time.temporal.Temporal ||
+                obj instanceof java.time.Duration ||
+                obj instanceof java.time.Period) {
+            return true;
+        }
+
+        // URI and URL
+        if (obj instanceof java.net.URI || obj instanceof java.net.URL) {
+            return true;
+        }
+
+        // UUID
+        if (obj instanceof java.util.UUID) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Copy an array
+     */
+    private static Object copyArray(Object original, Map<Object, Object> copyMap) {
+        int length = Array.getLength(original);
+        Class<?> componentType = original.getClass().getComponentType();
+        Object newArray = Array.newInstance(componentType, length);
+
+        // Register in copy map to handle self-references
+        copyMap.put(original, newArray);
+
+        if (componentType.isPrimitive()) {
+            // Fast copy for primitive arrays
+            System.arraycopy(original, 0, newArray, 0, length);
+        } else {
+            // Deep copy for object arrays
+            for (int i = 0; i < length; i++) {
+                Object element = Array.get(original, i);
+                Object copiedElement = deepCopyInternal(element, copyMap);
+                Array.set(newArray, i, copiedElement);
+            }
+        }
+
+        return newArray;
+    }
+
+    /**
+     * Copy a collection
+     */
+    private static Collection<?> copyCollection(Collection<?> original, Map<Object, Object> copyMap) {
+        Collection<?> newCollection;
+
+        try {
+            // Try to create the same collection type
+            newCollection = original.getClass().getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            // Fallback to ArrayList for lists, HashSet for sets, LinkedList for queues
+            if (original instanceof List) {
+                newCollection = new ArrayList<>();
+            } else if (original instanceof Set) {
+                newCollection = new HashSet<>();
+            } else if (original instanceof Queue) {
+                newCollection = new LinkedList<>();
+            } else {
+                newCollection = new ArrayList<>();
+            }
+        }
+
+        // Register in copy map
+        copyMap.put(original, newCollection);
+
+        // Deep copy elements
+        for (Object element : original) {
+            Object copiedElement = deepCopyInternal(element, copyMap);
+            ((Collection<Object>) newCollection).add(copiedElement);
+        }
+
+        return newCollection;
+    }
+
+    /**
+     * Copy a map
+     */
+    private static Map<?, ?> copyMap(Map<?, ?> original, Map<Object, Object> copyMap) {
+        Map<?, ?> newMap;
+
+        try {
+            // Try to create the same map type
+            newMap = original.getClass().getDeclaredConstructor().newInstance();
+        } catch (Exception e) {
+            // Fallback to HashMap or LinkedHashMap
+            if (original instanceof LinkedHashMap) {
+                newMap = new LinkedHashMap<>();
+            } else {
+                newMap = new HashMap<>();
+            }
+        }
+
+        // Register in copy map
+        copyMap.put(original, newMap);
+
+        // Deep copy entries
+        for (Map.Entry<?, ?> entry : original.entrySet()) {
+            Object copiedKey = deepCopyInternal(entry.getKey(), copyMap);
+            Object copiedValue = deepCopyInternal(entry.getValue(), copyMap);
+            ((Map<Object, Object>) newMap).put(copiedKey, copiedValue);
+        }
+
+        return newMap;
+    }
+
+    /**
+     * Cache for class fields to avoid repeated reflection
+     */
+    private static final ConcurrentHashMap<Class<?>, List<Field>> FIELD_CACHE = new ConcurrentHashMap<>();
+
+    /**
+     * Copy a custom object using reflection with caching
+     */
+    private static Object copyObject(Object original, Class<?> clazz, Map<Object, Object> copyMap) {
+        try {
+            // Create new instance
+            Object newObj = clazz.getDeclaredConstructor().newInstance();
+
+            // Register in copy map
+            copyMap.put(original, newObj);
+
+            // Get cached fields
+            List<Field> fields = getFields(clazz);
+
+            // Copy each field
+            for (Field field : fields) {
+                Object value = field.get(original);
+                Object copiedValue = deepCopyInternal(value, copyMap);
+                field.set(newObj, copiedValue);
+            }
+
+            return newObj;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to copy object: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Get all non-static fields for a class, including inherited ones, with caching
+     */
+    private static List<Field> getFields(Class<?> clazz) {
+        return FIELD_CACHE.computeIfAbsent(clazz, c -> {
+            List<Field> fields = new ArrayList<>();
+            Class<?> current = c;
+
+            // Traverse inheritance chain
+            while (current != null && current != Object.class) {
+                for (Field field : current.getDeclaredFields()) {
+                    if (!Modifier.isStatic(field.getModifiers())) {
+                        field.setAccessible(true);
+                        fields.add(field);
+                    }
+                }
+                current = current.getSuperclass();
+            }
+
+            return fields;
+        });
+    }
+
 }

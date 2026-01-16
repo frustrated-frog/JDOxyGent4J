@@ -16,7 +16,6 @@
 
 package com.jd.oxygent.core;
 
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -25,12 +24,14 @@ import com.jd.oxygent.core.oxygent.infra.databases.BaseCache;
 import com.jd.oxygent.core.oxygent.infra.databases.BaseEs;
 import com.jd.oxygent.core.oxygent.infra.impl.databases.es.LocalEs;
 import com.jd.oxygent.core.oxygent.infra.impl.databases.redis.LocalCache;
+import com.jd.oxygent.core.oxygent.liveprompt.DynamicAgentManager;
 import com.jd.oxygent.core.oxygent.oxy.BaseFlow;
 import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
 import com.jd.oxygent.core.oxygent.oxy.BaseTool;
 import com.jd.oxygent.core.oxygent.oxy.agents.BaseAgent;
 import com.jd.oxygent.core.oxygent.oxy.agents.RemoteAgent;
 import com.jd.oxygent.core.oxygent.oxy.llms.BaseLlM;
+import com.jd.oxygent.core.oxygent.schemas.SSEMessage;
 import com.jd.oxygent.core.oxygent.schemas.contextengineer.ContextEngine;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyResponse;
@@ -52,9 +53,26 @@ import java.lang.reflect.Field;
 import java.net.http.HttpClient;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Base64;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Scanner;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 
 /**
  * OxyGent Multi-Agent System Core Management Class
@@ -109,6 +127,16 @@ public class Mas {
     private Map<String, Object> activeTasks = new ConcurrentHashMap<>();
     private Set<Object> backgroundTasks = new HashSet<>();
     private Map<String, Object> eventDict = new ConcurrentHashMap<>();
+    private Map<String, List<String>> streamDict = new ConcurrentHashMap<>();
+
+    /**
+     * feedback channel_id
+     */
+    public Map<String, List<String>> channelIdDict = new ConcurrentHashMap<>();
+    /**
+     * feedback blocking queue
+     */
+    public Map<String, LinkedBlockingQueue<String>> feedbackDict = new ConcurrentHashMap<>();
 
     private HttpClient httpClient;
 
@@ -133,7 +161,7 @@ public class Mas {
      * User's first query marker, used to implement query record saving only once, key is request_id, value is boolean
      */
     @JsonIgnore
-    public static Set firstQuerySet = ConcurrentHashMap.newKeySet();
+    public Set firstQuerySet = ConcurrentHashMap.newKeySet();
 
     /**
      * Temporarily store user query parameters, used to solve the problem of missing parameters in response when concatenating streaming answers
@@ -141,7 +169,25 @@ public class Mas {
      * value is body
      */
     @JsonIgnore
-    public static Map<Object, Map> queryParamMap = new ConcurrentHashMap();
+    public Map<Object, Map> queryParamMap = new ConcurrentHashMap();
+
+    /**
+     * function customization and message processing
+     */
+    @JsonIgnore
+    private BiFunction<Map, OxyRequest, Map> funcProcessMessage;
+
+    /**
+     * function customization and message body processing
+     */
+    @JsonIgnore
+    private Function<Map, Map> funcProcessMessageBody;
+    @JsonIgnore
+    private Function<Map<String, Object>, Map<String, Object>> funcInterceptor = x -> null;
+    @JsonIgnore
+    // Functional component (for request filtering and interception)
+    private Function<Map<String, Object>, Map<String, Object>> funcFilter = x -> x;
+
 
     /**
      * Default constructor, creates a MAS instance named "app"
@@ -170,6 +216,7 @@ public class Mas {
      * - Initialize database connections (Elasticsearch, Redis)
      * - Set up agent organization structure
      * - Initialize vector search if configured
+     * - Setting up dynamic agents for live prompt management
      *
      * @throws RuntimeException if errors occur during initialization
      */
@@ -186,7 +233,15 @@ public class Mas {
             }
             initAgentOrganization();
             showOrg();
-            log.info("MAS system initialization completed: {}", this.name);
+            log.info("📋 OxyGent MAS Management Initialization completed: {}", this.name);
+            log.info("================================");
+            try {
+                DynamicAgentManager.setupDynamicAgents(this);
+                log.debug("Dynamic agent management initialized");
+            } catch (Exception e) {
+                log.warn("Failed to setup dynamic agents", e);
+            }
+            log.info("================================");
         } catch (Exception e) {
             log.error("MAS initialization failed: {}", e.getMessage());
             throw new RuntimeException("MAS initialization failed", e);
@@ -322,9 +377,8 @@ public class Mas {
         Map<String, Object> properties = new HashMap<>();
 
         properties.put("node_id", Map.of("type", "keyword"));
-        properties.put("group_id", Map.of("type", "keyword"));
-        properties.put("request_id", Map.of("type", "keyword"));
         properties.put("node_type", Map.of("type", "keyword"));
+        properties.put("group_id", Map.of("type", "keyword"));
         properties.put("trace_id", Map.of("type", "keyword"));
         properties.put("caller", Map.of("type", "keyword"));
         properties.put("callee", Map.of("type", "keyword"));
@@ -379,15 +433,19 @@ public class Mas {
     Map<String, Object> createMessageMapping() {
         Map<String, Object> properties = new HashMap<>();
         properties.put("message_id", Map.of("type", "keyword"));
+        properties.put("group_id", Map.of("type", "keyword"));
         properties.put("trace_id", Map.of("type", "keyword"));
+        properties.put("node_id", Map.of("type", "keyword"));
+        properties.put("node_name", Map.of("type", "keyword"));
         properties.put("message", Map.of("type", "text"));
         properties.put("message_type", Map.of("type", "keyword"));
+        properties.put("message_event", Map.of("type", "keyword"));
+        properties.put("message_timestamp", Map.of("type", "long"));
         properties.put("create_time", Map.of(
                 "type", "date",
                 "format", "yyyy-MM-dd HH:mm:ss.SSSSSSSSS"
         ));
         properties.put("from_trace_id", Map.of("type", "keyword"));
-        properties.put("group_id", Map.of("type", "keyword"));
 
         Map<String, Object> mappings = new HashMap<>();
         mappings.put("properties", properties);
@@ -395,6 +453,120 @@ public class Mas {
         Map<String, Object> root = new HashMap<>();
         root.put("mappings", mappings);
         getEsSetting(root);
+        return root;
+    }
+
+    /**
+     * Create mapping for prompt index
+     */
+    public Map<String, Object> createPromptMapping() {
+        Map<String, Object> properties = new HashMap<>();
+
+        properties.put("prompt_key", Map.of("type", "keyword"));
+        properties.put("prompt_content", Map.of(
+                "type", "text",
+                "analyzer", "standard"
+        ));
+        properties.put("description", Map.of("type", "text"));
+        properties.put("category", Map.of("type", "keyword"));
+        properties.put("agent_type", Map.of("type", "keyword"));
+        properties.put("version", Map.of("type", "integer"));
+        properties.put("is_active", Map.of("type", "boolean"));
+        properties.put("created_at", Map.of("type", "date"));
+        properties.put("updated_at", Map.of("type", "date"));
+        properties.put("created_by", Map.of("type", "keyword"));
+        properties.put("tags", Map.of("type", "keyword"));
+
+        Map<String, Object> mappings = new HashMap<>();
+        mappings.put("properties", properties);
+
+        Map<String, Object> root = new HashMap<>();
+        root.put("mappings", mappings);
+        getEsSetting(root);
+
+        return root;
+    }
+
+    /**
+     * Create mapping for prompt history index
+     */
+    public Map<String, Object> createPromptHistoryMapping() {
+        Map<String, Object> properties = new HashMap<>();
+
+        properties.put("prompt_key", Map.of("type", "keyword"));
+        properties.put("prompt_content", Map.of(
+                "type", "text",
+                "analyzer", "standard"
+        ));
+        properties.put("description", Map.of("type", "text"));
+        properties.put("category", Map.of("type", "keyword"));
+        properties.put("agent_type", Map.of("type", "keyword"));
+        properties.put("version", Map.of("type", "integer"));
+        properties.put("is_active", Map.of("type", "boolean"));
+        properties.put("is_history", Map.of("type", "boolean"));
+        properties.put("history_id", Map.of("type", "keyword"));
+        properties.put("created_at", Map.of("type", "date"));
+        properties.put("updated_at", Map.of("type", "date"));
+        properties.put("archived_at", Map.of("type", "date"));
+        properties.put("created_by", Map.of("type", "keyword"));
+        properties.put("tags", Map.of("type", "keyword"));
+
+        Map<String, Object> mappings = new HashMap<>();
+        mappings.put("properties", properties);
+
+        Map<String, Object> root = new HashMap<>();
+        root.put("mappings", mappings);
+        getEsSetting(root);
+
+        return root;
+    }
+
+    /**
+     * Create mapping for rating index
+     */
+    public Map<String, Object> createRatingMapping() {
+        Map<String, Object> properties = new HashMap<>();
+
+        properties.put("rating_id", Map.of("type", "keyword"));
+        properties.put("trace_id", Map.of("type", "keyword"));
+        properties.put("rating_type", Map.of("type", "keyword"));
+        properties.put("user_id", Map.of("type", "keyword"));
+        properties.put("user_ip", Map.of("type", "ip"));
+        properties.put("comment", Map.of("type", "text"));
+        properties.put("erp", Map.of("type", "keyword"));
+        properties.put("create_time", Map.of("type", "keyword"));
+        properties.put("update_time", Map.of("type", "keyword"));
+
+        Map<String, Object> mappings = new HashMap<>();
+        mappings.put("properties", properties);
+
+        Map<String, Object> root = new HashMap<>();
+        root.put("mappings", mappings);
+        getEsSetting(root);
+
+        return root;
+    }
+
+    /**
+     * Create mapping for rating stats index
+     */
+    public Map<String, Object> createRatingStatsMapping() {
+        Map<String, Object> properties = new HashMap<>();
+
+        properties.put("trace_id", Map.of("type", "keyword"));
+        properties.put("like_count", Map.of("type", "integer"));
+        properties.put("dislike_count", Map.of("type", "integer"));
+        properties.put("total_ratings", Map.of("type", "integer"));
+        properties.put("satisfaction_rate", Map.of("type", "float"));
+        properties.put("last_updated", Map.of("type", "keyword"));
+
+        Map<String, Object> mappings = new HashMap<>();
+        mappings.put("properties", properties);
+
+        Map<String, Object> root = new HashMap<>();
+        root.put("mappings", mappings);
+        getEsSetting(root);
+
         return root;
     }
 
@@ -420,14 +592,14 @@ public class Mas {
 
             if (this.esClient instanceof BaseEs) {
                 BaseEs es = this.esClient;
-                String indexNameTrace = Config.getAppName() + "_trace";
-                es.createIndex(indexNameTrace, createTraceMapping());
-                String indexNameNode = Config.getAppName() + "_node";
-                es.createIndex(indexNameNode, createNodeMapping());
-                String indexNameHistory = Config.getAppName() + "_history";
-                es.createIndex(indexNameHistory, createHistoryMapping());
-                String indexNameMessage = Config.getAppName() + "_message";
-                es.createIndex(indexNameMessage, createMessageMapping());
+                es.createIndex(Config.getAppName() + "_trace", createTraceMapping());
+                es.createIndex(Config.getAppName() + "_node", createNodeMapping());
+                es.createIndex(Config.getAppName() + "_history", createHistoryMapping());
+                es.createIndex(Config.getAppName() + "_message", createMessageMapping());
+                es.createIndex(Config.getAppName() + "_prompt", createPromptMapping());
+                es.createIndex(Config.getAppName() + "_prompt_history", createPromptHistoryMapping());
+                es.createIndex(Config.getAppName() + "_rating", createRatingMapping());
+                es.createIndex(Config.getAppName() + "_rating_stats", createRatingStatsMapping());
             }
 
             if (this.redisClient == null) {
@@ -485,6 +657,12 @@ public class Mas {
                     toolNameList.add(toolName);
                 }
             }
+//            List<String> permittedOxyList = agent.getPermittedOxy();
+//            if (permittedOxyList != null) {
+//                for (String oxyName : permittedOxyList) {
+//                    toolNameList.add(oxyName);
+//                }
+//            }
 
             addTools(children, toolNameList, tempPath);
 
@@ -502,11 +680,12 @@ public class Mas {
         return currentTraceId.get();
     }
 
-
     @Data
     public class AgentNode {
         private String name;
         private String type;
+        private String desc;
+        private String path;
         private List<AgentNode> children = new ArrayList<>();
 
         public AgentNode() {
@@ -593,7 +772,7 @@ public class Mas {
             batchInitOxy(BaseLlM.class);
             batchInitOxy(BaseTool.class);
             batchInitOxy(BaseFlow.class);
-            batchInitOxy(BaseAgent.class);
+//            batchInitOxy(BaseAgent.class);
             log.info("All Oxy components initialization completed");
 
         } catch (Exception e) {
@@ -695,46 +874,97 @@ public class Mas {
         }
     }
 
-    public void sendMessage(Map<String, Object> body, String sendMsgKey) {
+    public void sendMessage(SSEMessage<Map<String, Object>> sseMessage, String sendMsgKey, OxyRequest oxyRequest) {
+        Map<String, Object> body = sseMessage.getData();
         try {
-            if (Config.getMessage().isShowInTerminal()) {
-                log.info("--- Send Message ---: {}", body);
+            if (funcProcessMessage != null) {
+                body = funcProcessMessage.apply(body, oxyRequest);
             }
-            if (this.redisClient != null && sendMsgKey != null) {
-                byte[] messageByte = packMessage(body);
+            if (Config.getMessage().isShowInTerminal()) {
+                log.info("--- Send Message ---: {}", JsonUtils.toJSONString(sseMessage));
+            }
+            boolean isStored = Config.getMessage().isStored();
+            boolean isSend = true;
+            if (body.get("_is_stored") != null && body.get("_is_stored") instanceof Boolean _isStored) {
+                isStored = _isStored;
+                body.remove("_is_stored");
+            }
+            if (body.get("_is_send") != null && body.get("_is_send") instanceof Boolean _isSend) {
+                isSend = isSend;
+                body.remove("_is_send");
+            }
+            if (isSend && this.redisClient != null && sendMsgKey != null) {
+                byte[] messageByte = packMessage(sseMessage);
                 String base64 = Base64.getEncoder().encodeToString(messageByte);
                 redisClient.lpush(sendMsgKey, base64);
             }
-            if (Config.getMessage().isStored() && this.esClient != null) {
-                String type = body.get("type") != null ? body.getOrDefault("type", "").toString() : body.getOrDefault("message_type", "").toString();
+            if (isStored && this.esClient != null) {
+                String messageType = body.get("type") != null ? body.getOrDefault("type", "").toString() : body.getOrDefault("message_type", "").toString();
                 Map<String, Object> content = body;
-                if (body.get("content") instanceof Map contentMap && !"todolist".equals(type)) {
+                if (body.get("content") instanceof Map contentMap && !"todolist".equals(messageType)) {
                     content = contentMap;
                 }
-                Map<String, Object> messageData = new HashMap<>();
-                messageData.put("message_id", CommonUtils.generateShortUUID(16));
-                messageData.put("trace_id", content.get("current_trace_id"));
-                Map _copy = ObjectUtils.deepCopy(body);
-                removeAbandonedFields(_copy);
-                messageData.put("message", JsonUtils.writeValueAsString(_copy));
+                String nodeId = (String) content.get("node_id");
+                String delta = content.get("delta") != null ? (String) content.get("delta") : "";
+                if ("stream".equals(messageType)) {
+                    if (streamDict.get(nodeId) == null) {
+                        streamDict.put(nodeId, new ArrayList<String>());
+                    }
+                    streamDict.get(nodeId).add(delta);
+                }
+                if ("stream_end".equals(messageType) || (nodeId != null && streamDict.get(nodeId) != null && streamDict.get(nodeId).size() >= Config.getMessage().getStreamBatchSize())) {
+                    body.put("type", "merged_stream");
+                    body.put("node_id", content.get("node_id"));
 
-                messageData.put("message_type", type);
-                messageData.put("caller", content.get("caller"));
-                messageData.put("callee", content.get("callee"));
-                messageData.put("callee_category", content.get("callee_category"));
-                messageData.put("caller_category", content.get("caller_category"));
-                messageData.put("create_time", CommonUtils.getFormatTime());
-                messageData.put("from_trace_id", content.get("from_trace_id"));
-                messageData.put("group_id", content.get("group_id"));
-                messageData.put("body", _copy);
-                esClient.index(Config.getAppName() + "_message", messageData.getOrDefault("message_id", "").toString(), messageData);
+                    Map<String, Object> streamMessageData = new HashMap<>();
+                    streamMessageData.put("message_id", sseMessage.getId());
+                    streamMessageData.put("group_id", oxyRequest.getGroupId());
+                    streamMessageData.put("trace_id", currentTraceId.get());
+                    streamMessageData.put("node_id", nodeId);
+                    streamMessageData.put("node_name", content.get("agent"));
+                    Map<String, String> streamMessageBody = new HashMap<>();
+                    streamMessageBody.put("type", "merged_stream");
+                    streamMessageBody.put("content", streamDict.get(nodeId) != null ? String.join("", streamDict.get(nodeId)) : delta);
+                    streamMessageData.put("message", JsonUtils.toJSONString(streamMessageBody));
+                    streamMessageData.put("message_type", "merged_stream");
+                    streamMessageData.put("message_event", sseMessage.getEvent());
+                    streamMessageData.put("message_timestamp", body.get("timestamp") != null ? body.get("timestamp") : CommonUtils.getTimestamp());
+                    streamMessageData.put("create_time", CommonUtils.getFormatTime());
+                    esClient.index(Config.getAppName() + "_message", streamMessageData.get("message_id").toString(), streamMessageData);
+                    streamDict.remove(nodeId);
+                } else {
+                    Map _copy = null;
+                    if (funcProcessMessageBody != null) {
+                        _copy = funcProcessMessageBody.apply(body);
+                    } else {
+                        _copy = removeAbandonedFields(body);
+                    }
+                    Map<String, Object> nonStreamMessageData = new HashMap<>();
+                    nonStreamMessageData.put("message_id", sseMessage.getId());
+                    nonStreamMessageData.put("group_id", oxyRequest.getGroupId());
+                    nonStreamMessageData.put("trace_id", currentTraceId.get());
+                    nonStreamMessageData.put("node_id", nodeId);
+                    nonStreamMessageData.put("node_name", content.get("agent"));
+                    nonStreamMessageData.put("message", JsonUtils.writeValueAsString(_copy));
+                    nonStreamMessageData.put("message_type", messageType);
+                    nonStreamMessageData.put("message_event", sseMessage.getEvent());
+                    nonStreamMessageData.put("message_timestamp", _copy.get("timestamp") != null ? _copy.get("timestamp") : CommonUtils.getTimestamp());
+                    nonStreamMessageData.put("create_time", CommonUtils.getFormatTime());
+                    nonStreamMessageData.put("from_trace_id", content.get("from_trace_id"));
+                    nonStreamMessageData.put("caller", content.get("caller"));
+                    nonStreamMessageData.put("callee", content.get("callee"));
+                    nonStreamMessageData.put("callee_category", content.get("callee_category"));
+                    nonStreamMessageData.put("caller_category", content.get("caller_category"));
+                    nonStreamMessageData.put("body", _copy);
+                    esClient.index(Config.getAppName() + "_message", nonStreamMessageData.getOrDefault("message_id", "").toString(), nonStreamMessageData);
+                }
             }
         } catch (Exception e) {
             log.error("Failed to send message", e);
         }
     }
 
-    public byte[] packMessage(Map<String, Object> message) throws IOException {
+    public byte[] packMessage(Object message) throws IOException {
         if (message != null) {
             return objectMapper.writeValueAsBytes(message);
         } else {
@@ -742,8 +972,17 @@ public class Mas {
         }
     }
 
-    public Map unpackMessage(byte[] bytesMsg) throws IOException {
-        return objectMapper.readValue(bytesMsg, Map.class);
+    public SSEMessage unpackMessage(byte[] bytesMsg) throws IOException {
+        // Unpack message
+        SSEMessage sseMessage = null;
+        try {
+            sseMessage = objectMapper.readValue(bytesMsg, SSEMessage.class);
+        } catch (Exception e) {
+            // Compatible with data from older versions
+            Map<String, Object> msgMap = objectMapper.readValue(bytesMsg, Map.class);
+            new SSEMessage((String) msgMap.get("event"), msgMap);
+        }
+        return sseMessage;
     }
 
     /**
@@ -790,10 +1029,8 @@ public class Mas {
         }
         Object requestId = JsonUtils.firstNotBlank(payload.get("request_id"), payload.get("req_id"), payload.get("requestId"));
         if (requestId != null) {
-            Mas.firstQuerySet.add(requestId);
-            Mas.queryParamMap.put(requestId, payload);
-        } else {
-            log.warn("requestId is null");
+            firstQuerySet.add(requestId);
+            queryParamMap.put(requestId, payload);
         }
 
         Object query = payload.get("query");
@@ -851,7 +1088,9 @@ public class Mas {
             }
 
             OxyRequest oxyRequest = OxyRequest.builder().mas(this).build();
-
+            if (sendMsgKey == null) {
+                oxyRequest.setSendMessage(false);
+            }
             Set<String> oxyRequestFields = new HashSet<>();
             for (Field field : OxyRequest.class.getDeclaredFields()) {
                 oxyRequestFields.add(field.getName());
@@ -886,9 +1125,10 @@ public class Mas {
                 Map<String, Object> message = new HashMap<>();
                 message.put("event", "close");
                 message.put("data", "done");
-                sendMessage(message, sendMsgKey);
+                sendMessage(new SSEMessage("close", message), sendMsgKey, oxyRequest);
             }
         } finally {
+            clearQueues(currentTraceId.get());
             currentTraceId.remove();
         }
 
@@ -1188,25 +1428,37 @@ public class Mas {
     /**
      * Filter out some redundant fields before saving to ES
      *
-     * @param _copy
+     * @param body
      */
-    public static void removeAbandonedFields(Map _copy) {
-        Map _content = _copy;
-        if (_copy.get("content") instanceof Map contentMap) {
-            _content = contentMap;
+    public Map removeAbandonedFields(Map body) {
+        if (body.get("content") instanceof Map contentMap && (contentMap.get("arguments") != null || contentMap.get("shared_data") != null)) {
+            Map _copy = ObjectUtils.deepCopy(body);
+            Map _content = (Map) _copy.get("content");
+            if (_content.get("arguments") instanceof Map argumentsMap) {
+                Map _arguments = argumentsMap;
+                _arguments.remove("agent_config");
+                _arguments.remove("messages");
+            }
+            if (_content.get("shared_data") instanceof Map sharedDataMap) {
+                sharedDataMap.remove("_headers");
+                Object requestId = JsonUtils.firstNotBlank(_content.get("request_id"), _content.get("req_id"), _content.get("requestId"));
+                if (!"tool_call".equals(_copy.get("type")) || requestId == null || !firstQuerySet.contains(requestId)) {
+                    sharedDataMap.remove("files");
+                    sharedDataMap.remove("first_query_struct");
+                }
+            }
+            return _copy;
+        } else {
+            return body;
         }
-        if (_content.get("arguments") instanceof Map argumentsMap) {
-            Map _arguments = argumentsMap;
-            _arguments.remove("agent_config");
-            _arguments.remove("messages");
-        }
-        if (_content.get("shared_data") instanceof Map shareddataMap) {
-            Map _sharedData = shareddataMap;
-            _sharedData.remove("_headers");
-            Object requestId = JsonUtils.firstNotBlank(_content.get("request_id"), _content.get("req_id"), _content.get("requestId"));
-            if (!"tool_call".equals(_copy.get("type")) || requestId == null || !Mas.firstQuerySet.contains(requestId)) {
-                _sharedData.remove("files");
-                _sharedData.remove("first_query_struct");
+    }
+
+    public void clearQueues(String traceId) {
+        if (traceId != null && channelIdDict.get(traceId) != null) {
+            for (String channelId : channelIdDict.get(traceId)) {
+                if (channelId != null && feedbackDict.containsKey(channelId)) {
+                    feedbackDict.remove(channelId);
+                }
             }
         }
     }

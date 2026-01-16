@@ -30,6 +30,7 @@ import com.jd.oxygent.core.oxygent.utils.EnvUtils;
 import com.jd.oxygent.core.oxygent.samples.server.masprovider.engine.annotation.OxySpaceBean;
 import com.jd.oxygent.core.oxygent.samples.server.utils.GlobalDefaultOxySpaceMapping;
 
+import com.jd.oxygent.core.oxygent.utils.OSUtil;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -327,11 +328,10 @@ public class DemoBrowser {
      * @throws IllegalArgumentException Thrown when configuration parameters are invalid
      */
     @OxySpaceBean(
-            value = "browserJavaOxySpace", defaultStart = true,
+            value = "demoBrowser", defaultStart = true,
             query = "Search on JD.com for the latest down jackets of the 2025 winter season, retrieve the names, prices, store names, sales volumes, and number of positive reviews for the top 10 products in the results list, and save this extracted data into a file named down_coat.txt. If no results are found on JD.com, terminate the search immediately."
     )
     public static List<BaseOxy> getDefaultOxySpace() {
-
         return Arrays.asList(
                 // 1. HTTP LLM configuration
                 HttpLlm.builder()
@@ -354,52 +354,50 @@ public class DemoBrowser {
                         .isMultimodalSupported(false)
                         .build(),
                 // 2. Browser tools
-                // mac or linux version
-//                new StdioMCPClient("browser_tools",
-//                        "npx",
-////                        Arrays.asList("-y", "@playwright/mcp@latest",
-////                                "--timeout-action=10000",
-////                                "--timeout-navigation=60000",
-////                                "--browser=msedge",
-////                                "--extension",
-////                                "--executable-path=%LOCALAPPDATA%/ms-playwright/chromium-1194/chrome-win/chrome.exe"
-////                                "--isolated"
-//                        Arrays.asList("-y", "chrome-devtools-mcp@latest",
-////                                "--logFile=/logs/browser.log", // 仅测试环境使用,数据量太大且不会清理生产环境会占用大量磁盘空间
-////                                "--executable-path=%LOCALAPPDATA%/ms-playwright/chromium-1194/chrome-win/chrome.exe"
-//                                "--isolated=true"
-//                        )) {{
-//                            setCategory("tool");
-//                            setClassName("StdioMCPClient");
-                //                            setDesc("A tool for browser operations, such as accessing URLs, retrieving page content, and analyzing web pages");
-                //                            setDescForLlm("Browser automation and web scraping tool");
-//                            setEntrance(false);
-//                            setPermissionRequired(false);
-//                            setSaveData(true);
-//                            setTimeout(600);
-//                            setRetries(5);
-                //                            setFriendlyErrorText("Browser operation failed");
-//                            setSemaphoreCount(2);
-//                }},
-                // windows version
-                new StdioMCPClient("browser_tools",
-                        "cmd",
-                        Arrays.asList("/c", "npx", "-y", "chrome-devtools-mcp@latest",
-                                "npx",
-                                "--isolated=true"
-                        )) {{
-                    setCategory("tool");
-                    setClassName("StdioMCPClient");
-                    setDesc("A tool for browser operations, such as accessing URLs, retrieving page content, and analyzing web pages");
-                    setDescForLlm("Browser automation and web scraping tool");
-                    setEntrance(false);
-                    setPermissionRequired(false);
-                    setSaveData(true);
-                    setTimeout(600);
-                    setRetries(5);
-                    setFriendlyErrorText("Browser operation failed");
-                    setSemaphoreCount(2);
-                }},
+                OSUtil.isWindows() ?
+                        // windows version
+                        new StdioMCPClient("browser_tools",
+                                "cmd",
+                                Arrays.asList("/c", "npx", "-y", "chrome-devtools-mcp@latest",
+                                        "npx",
+//                                        "--logFile=/logs/browser.log",
+//                                        "--executable-path=%LOCALAPPDATA%/ms-playwright/chromium-1194/chrome-win/chrome.exe",
+                                        "--isolated=true"
+                                )) {{
+                            setCategory("tool");
+                            setClassName("StdioMCPClient");
+                            setDesc("A tool for browser operations, such as accessing URLs, retrieving page content, and analyzing web pages");
+                            setDescForLlm("Browser automation and web scraping tool");
+                            setEntrance(false);
+                            setPermissionRequired(false);
+                            setSaveData(true);
+                            setTimeout(600);
+                            setRetries(5);
+                            setFriendlyErrorText("Browser operation failed");
+                            setSemaphoreCount(2);
+                        }}
+                :
+                        // mac or linux version
+                        new StdioMCPClient("browser_tools",
+                                "cmd",
+                                Arrays.asList("-y", "chrome-devtools-mcp@latest",
+                                        "npx",
+//                                        "--logFile=/logs/browser.log",
+                                        "--isolated=true"
+                                )) {{
+                            setCategory("tool");
+                            setClassName("StdioMCPClient");
+                            setDesc("A tool for browser operations, such as accessing URLs, retrieving page content, and analyzing web pages");
+                            setDescForLlm("Browser automation and web scraping tool");
+                            setEntrance(false);
+                            setPermissionRequired(false);
+                            setSaveData(true);
+                            setTimeout(600);
+                            setRetries(5);
+                            setFriendlyErrorText("Browser operation failed");
+                            setSemaphoreCount(2);
+                        }}
+                ,
                 // 3. File tools
                 PresetTools.FILE_TOOLS,
                 // 4. Time tools

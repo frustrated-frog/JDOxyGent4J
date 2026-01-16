@@ -30,6 +30,7 @@ import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -83,6 +84,9 @@ public class Config {
     private static AgentConfig agent = new AgentConfig();
     private static FileConfig xfile = new FileConfig();
     private static VearchConfig vearch = new VearchConfig();
+    private static OxyConfig oxy = new OxyConfig();
+    private static ToolConfig tool = new ToolConfig();
+    private static LivePromptConfig livePrompt = new LivePromptConfig();
 
     static {
         loadConfigFile();
@@ -140,6 +144,14 @@ public class Config {
                             config -> xfile = config);
                     loadConfigSafely(defaultConf, "vearch", VearchConfig.class, () -> vearch = new VearchConfig(),
                             config -> vearch = config);
+                    loadConfigSafely(defaultConf, "oxy", OxyConfig.class, () -> oxy = new OxyConfig(),
+                            config -> oxy = config);
+                    loadConfigSafely(defaultConf, "tool", ToolConfig.class, () -> tool = new ToolConfig(),
+                            config -> tool = config);
+                    loadConfigSafely(defaultConf, "livePrompt", LivePromptConfig.class, () -> livePrompt = new LivePromptConfig(),
+                            config -> livePrompt = config);
+
+                    setServerWorker();
                     log.info("Finished reading config.json, path:{} env:{}", configFilePath, configFileEnv);
                 }
             }
@@ -207,6 +219,14 @@ public class Config {
         }
     }
 
+    private static void setServerWorker() {
+        try {
+            Config.getServer().setWorkers(Runtime.getRuntime().availableProcessors() * 2 + 1);
+        } catch (Exception e) {
+            // ignore
+        }
+    }
+
     /**
      * Agent Configuration Class
      * <p>
@@ -222,7 +242,8 @@ public class Config {
                 ),
                 "required", List.of("query")
         );
-        private int maxMemoryRounds = 5;
+        private int shortMemorySize = 10;
+        private String welcomeMessage = "Hi, I’m OxyGent. How can I assist you?";
     }
 
     /**
@@ -235,7 +256,7 @@ public class Config {
         private String name = "app";
         private String version = "1.0.0";
         private String bizType = "oxygent";
-        private String scanOxygentPath = "com.jd.oxygent";
+        private String scanOxygentPath = "com.jd";
     }
 
     @Data
@@ -264,13 +285,11 @@ public class Config {
      */
     @Data
     public static class LlmConfig {
-        private String cls = "com.jd.oxygent.core.oxygent.oxy.llms.HttpLLm";
-        private String baseUrl = "http://localhost:11434";
-        private String apiKey = "YOUR-API-KEY";
-        private String modelName = "gpt-4.1";
         private double temperature = 0.1;
         private int maxTokens = 4096;
         private double topP = 1.0;
+        private int semaphore = 16;
+        private double timeout = 300.0; // seconds
     }
 
     @Data
@@ -284,6 +303,7 @@ public class Config {
         private boolean isStored = true;
         private boolean isShowInTerminal = false;
         private boolean isSendFullArguments = false;
+        private Integer streamBatchSize = 256;
     }
 
     @Data
@@ -302,12 +322,45 @@ public class Config {
         private boolean autoOpenWebpage = true;
         private String logLevel = "INFO";
         private String firstQuery = "What time is it now?";
-        private String welcomeMessage = "Hi, I’m OxyGent. How can I assist you?";
+        private int workers = 1;
     }
 
     @Data
     public static class VearchConfig {
         private boolean enabled = false;
+    }
+
+    @Data
+    public static class OxyConfig {
+        private int semaphore = 1024;
+        private double timeout = 3600; // Timeout in seconds
+        private int retries = 2;
+        private double delay = 1.0; // delay in seconds
+    }
+
+    @Data
+    public static class ToolConfig {
+        private boolean mcpIsKeepAlive = true;
+        private boolean isConcurrentInit = true;
+        private int semaphore = 1024;
+        private double timeout = 60.0; // seconds
+    }
+
+    @Data
+    public static class LivePromptConfig {
+        private boolean useEsPolling = false;
+        /**
+         * ES polling interval in seconds for version sync, set 0 to disable polling
+         */
+        private int esPollingInterval = 2;
+    }
+
+    public static Map getLlmConfigMap() {
+        Map llmConfig = new HashMap<>();
+        llmConfig.put("temperature", llm.getTemperature());
+        llmConfig.put("max_tokens", llm.getMaxTokens());
+        llmConfig.put("top_p", llm.getTopP());
+        return llmConfig;
     }
 
     public static String getAppName() {
@@ -400,5 +453,29 @@ public class Config {
 
     public static String getConfigFileEnv() {
         return configFileEnv;
+    }
+
+    public static OxyConfig getOxy() {
+        return oxy;
+    }
+
+    public static void setOxy(OxyConfig oxy) {
+        Config.oxy = oxy;
+    }
+
+    public static ToolConfig getTool() {
+        return tool;
+    }
+
+    public static void setTool(ToolConfig tool) {
+        Config.tool = tool;
+    }
+
+    public static LivePromptConfig getLivePrompt() {
+        return livePrompt;
+    }
+
+    public static void setLivePrompt(LivePromptConfig livePrompt) {
+        Config.livePrompt = livePrompt;
     }
 }

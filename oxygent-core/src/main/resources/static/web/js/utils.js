@@ -1,12 +1,5 @@
 /**
- * Utility Functions
- * @author OxyGent Team
- * @version 1.0.0
- * @since 1.0.0
- */
-
-/**
- * @description Remove duplicates
+ * @description 去重
  * @param {*} data
  * @returns
  */
@@ -15,7 +8,7 @@ function unionName(data) {
 }
 
 /**
- * @description Convert array to map
+ * @description 数组转map
  * @param {*} nodes
  * @returns
  */
@@ -28,7 +21,7 @@ function arrayToMap(nodes) {
 }
 
 /**
- * @description Build tree structure
+ * @description 构建树结构
  * @param {*} nodes
  * @returns
  */
@@ -37,12 +30,12 @@ function buildTree(nodes) {
     const nodeMap = {};
     const tree = [];
 
-    // First, store all nodes in the mapping table
+    // 首先将所有节点存入映射表
     for (const node of nodes) {
         nodeMap[node.node_id] = {...node, children: []};
     }
 
-    // Then build tree structure
+    // 然后构建树结构
     for (const node of nodes) {
         if (node.father_node_id === '') {
             tree.push(nodeMap[node.node_id]);
@@ -58,27 +51,27 @@ function buildTree(nodes) {
 }
 
 /**
- * @description Get variable type
+ * @description 获取变量类型
  * @param {*} value
  * @returns
  */
 function getType(value) {
-    // Handle special case of null
+    // 处理 null 的特殊情况
     if (value === null) {
         return 'null';
     }
 
-    // Handle basic types
+    // 处理基本类型
     const type = typeof value;
     if (type !== 'object') {
         return type;
     }
 
-    // Handle object types
+    // 处理对象类型
     const toString = Object.prototype.toString.call(value);
     const typeString = toString.slice(8, -1).toLowerCase();
 
-    // Special handling for some types
+    // 特殊处理一些类型
     if (typeString === 'object') {
         if (value.constructor) {
             return value.constructor.name.toLowerCase();
@@ -89,7 +82,7 @@ function getType(value) {
 }
 
 /**
- * @description Generate script ID
+ * @description 生成脚本id
  * @returns
  */
 function generateScriptId() {
@@ -110,10 +103,10 @@ function getTextWidth(text) {
         float: 'left',
         whiteSpace: 'nowrap',
         visibility: 'hidden',
-        fontSize: $('#message_input').css('font-size') // Or other style properties
+        fontSize: $('#message_input').css('font-size') // 或者其他样式属性
     }).text(text);
     $('body').append(tempDiv);
     var width = tempDiv.width();
-    tempDiv.remove(); // Remove temporary element, clean up DOM
+    tempDiv.remove(); // 移除临时元素，清理DOM
     return width;
 }

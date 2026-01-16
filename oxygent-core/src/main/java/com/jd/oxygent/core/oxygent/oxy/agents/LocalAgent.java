@@ -17,8 +17,11 @@ package com.jd.oxygent.core.oxygent.oxy.agents;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.jd.oxygent.core.Config;
+import com.jd.oxygent.core.oxygent.liveprompt.PromptManager;
 import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
 import com.jd.oxygent.core.oxygent.oxy.BaseTool;
+import com.jd.oxygent.core.oxygent.oxy.bank_tools.BankClient;
+import com.jd.oxygent.core.oxygent.oxy.bank_tools.BankTool;
 import com.jd.oxygent.core.oxygent.oxy.function_tools.FunctionHub;
 import com.jd.oxygent.core.oxygent.oxy.function_tools.FunctionTool;
 import com.jd.oxygent.core.oxygent.oxy.mcp.BaseMCPClient;
@@ -125,11 +128,29 @@ public class LocalAgent extends BaseAgent {
     protected String prompt = Config.getAgent().getPrompt();
 
     /**
+     * Key for live prompt lookup. Defaults to '{agent_name}_prompt' if not specified. Used for dynamic prompt hot-reloading.
+     */
+    @Builder.Default
+    protected String promptKey = null;
+
+    /**
+     * Whether to use live prompt system. If False, only uses the static 'prompt' parameter from code.
+     */
+    @Builder.Default
+    protected boolean userLivePrompt = true;
+
+    /**
      * Additional prompt
      * Extra instructions or context information supplementing the main prompt
      */
     @Builder.Default
     protected String additionalPrompt = "";
+
+    @Builder.Default
+    private String resolvedPrompt = null;
+
+    @Builder.Default
+    protected String toolsPlaceholder = "tools_description";
 
     /**
      * Sub-agent list
@@ -152,11 +173,17 @@ public class LocalAgent extends BaseAgent {
     @Builder.Default
     protected List<String> exceptTools = new ArrayList<>();
 
+    /**
+     * Banks available to this agent
+     */
+    @Builder.Default
+    protected List<String> banks = new ArrayList<>();
+
     // ========== Tool Retrieval Configuration ==========
 
     /**
      * Whether to enable tool search
-     * When true, the agent can dynamically search and discover new tools
+     * When true, the agent can dynamically search and discover new toolsBankTool
      */
     @Builder.Default
     protected boolean isSourcingTools = false;
@@ -242,7 +269,7 @@ public class LocalAgent extends BaseAgent {
     public LocalAgent() {
         this.llmModel = Config.getAgent().getLlmModel();
         if (this.llmModel == null || this.llmModel.isEmpty()) {
-            throw new IllegalStateException("Agent " + this.getName() + " has not set LLM model");
+            throw new IllegalStateException("Agent " + getName() + " has not set LLM model");
         }
     }
 
@@ -302,10 +329,32 @@ public class LocalAgent extends BaseAgent {
                 logger.warn("Unknown tool type: {}", oxy.getClass());
             }
         }
+
+        // banks
+        for (String oxyName : new HashSet<>(banks)) {
+            if (!this.getMas().getOxyNameToOxy().containsKey(oxyName)) {
+                throw new IllegalStateException("Bank [" + oxyName + "] not exists.");
+            }
+            BaseOxy oxy = this.getMas().getOxyNameToOxy().get(oxyName);
+            if (oxy instanceof BankTool) {
+                this.addPermittedTool(oxyName);
+            } else if (oxy instanceof BankClient) {
+                BankClient client = (BankClient) oxy;
+                for (String toolName : client.getIncludedBankNameList()) {
+                    this.addPermittedTool(toolName);
+                }
+            } else {
+                logger.warn("Unknown bank type: {}", oxy.getClass());
+            }
+        }
     }
 
     /**
-     * Agent initialization
+     * Initialize the agent and set up team-based execution if configured.
+     *
+     *         This method performs agent initialization including tool setup and creates
+     *         parallel agent instances for team-based execution when team_size > 1.
+     *
      *
      * <p>Completes the full initialization process of LocalAgent, including:</p>
      * <ol>
@@ -317,7 +366,26 @@ public class LocalAgent extends BaseAgent {
      *
      * @throws IllegalStateException if LLM model does not exist or configuration is invalid
      */
+    @Override
     public void init() {
+        // Resolve dynamic prompt if live prompt is enabled
+        if (userLivePrompt) {
+            if (promptKey == null) {
+                promptKey = getName() + "_prompt";
+            }
+            // Resolve the prompt from live prompt system
+            try {
+                String fallback = prompt != null ? prompt : "";
+                resolvedPrompt = getDynamicPrompt(promptKey, fallback);
+                logger.debug("Agent {} resolved prompt via key {}: {} chars",  getName(), promptKey, resolvedPrompt.length());
+            } catch (Exception e) {
+                logger.error("Failed to reload prompt for agent {} with key {}", getName(), promptKey, e);
+            }
+        } else {
+            resolvedPrompt = prompt != null ? prompt : "";
+            logger.debug("Agent {} using static prompt from code (live prompt disabled)", getName());
+        }
+
         super.init();
 
         // Add intent understanding agent
@@ -334,7 +402,7 @@ public class LocalAgent extends BaseAgent {
         }
 
         logger.debug("LocalAgent initialization completed: {}, tool count: {}",
-                this.getName(), this.getPermittedToolNameList().size());
+                getName(), this.getPermittedToolNameList().size());
 
         // TODO: Team mode functionality to be implemented
         // When teamSize > 1, create multiple agent instances for parallel processing
@@ -479,7 +547,7 @@ public class LocalAgent extends BaseAgent {
 
                     // Add debug information, check parsed content length
                     if (a != null) {
-                        String answerStr = String.valueOf(a);
+                        String answerStr = a instanceof String ? (String) a : String.valueOf(a);
                         logger.debug("Parsed answer length: {}, ends with: '{}'",
                                 answerStr.length(),
                                 answerStr.length() > 50 ? answerStr.substring(Math.max(0, answerStr.length() - 50)) : answerStr);
@@ -559,6 +627,7 @@ public class LocalAgent extends BaseAgent {
         return llmToolDescList;
     }
 
+    @Override
     protected OxyRequest preProcess(OxyRequest oxyRequest) {
         OxyRequest req = super.preProcess(oxyRequest);
 
@@ -573,6 +642,7 @@ public class LocalAgent extends BaseAgent {
         return req;
     }
 
+    @Override
     protected OxyRequest beforeExecute(OxyRequest oxyRequest) {
         OxyRequest req = super.beforeExecute(oxyRequest);
         String rewrittenQuery = req.getQuery();
@@ -588,7 +658,7 @@ public class LocalAgent extends BaseAgent {
 
         List<String> llmToolDescList = getLlmToolDescList(req, rewrittenQuery);
         req.getArguments().put("additional_prompt", this.additionalPrompt);
-        req.getArguments().put("tools_description", String.join("\n\n", llmToolDescList));
+        req.getArguments().put(toolsPlaceholder, String.join("\n\n", llmToolDescList));
 
         return req;
     }
@@ -605,8 +675,9 @@ public class LocalAgent extends BaseAgent {
             matcher.appendReplacement(sb, Matcher.quoteReplacement(replacement));
         }
         matcher.appendTail(sb);
-
-        return sb.toString();
+        // Use resolved prompt (with live prompt support) instead of static prompt
+        String promptToUse = resolvedPrompt != null ? resolvedPrompt : (prompt != null ? prompt : "");
+        return sb.append(promptToUse.trim()).toString();
     }
 
     @Override
@@ -704,5 +775,38 @@ public class LocalAgent extends BaseAgent {
         return sb.toString();
     }
 
+    /**
+     * Reload prompt from live prompt system (hot reload support).
+     *
+     * This method re-fetches the prompt from storage, enabling hot updates
+     * without restarting the agent. Useful when prompts are modified in the
+     * management platform.
+     *
+     * @return bool: True if prompt was successfully reloaded, False otherwise.
+     */
+    public boolean reloadPrompt() {
+        // Check if live prompt is enabled
+        if (!userLivePrompt) {
+            logger.debug("Agent {} has live prompt disabled, skipping reload", getName());
+            return false;
+        }
+        try {
+            String fallback = prompt != null ? prompt : "";
+            String newPrompt = getDynamicPrompt(promptKey, fallback);
+            if (!newPrompt.equals(resolvedPrompt)) {
+                resolvedPrompt = newPrompt;
+                logger.info("Agent {} prompt hot-reloaded via key {}: {} chars", getName(), promptKey, resolvedPrompt.length());
+            } else {
+                logger.debug("Agent {} prompt unchanged", getName());
+            }
+            return true;
+        } catch (Exception e) {
+            logger.error("Failed to reload prompt for agent {} with key {}", getName(), promptKey, e);
+            return false;
+        }
+    }
 
+    private String getDynamicPrompt(String promptKey, String fallback) {
+        return PromptManager.getDynamicPrompt(promptKey, fallback, true);
+    }
 }

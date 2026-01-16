@@ -35,7 +35,6 @@ public class SpringMasFactory extends PlatformMasFactory {
             this.doAutowireMas(mas);
             mas.setOxySpace(oxySpace);
             mas.init();
-        masMap.put(masName, mas);
         return mas;
     }
 

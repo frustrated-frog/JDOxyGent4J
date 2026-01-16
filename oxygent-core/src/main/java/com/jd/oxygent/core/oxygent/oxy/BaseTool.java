@@ -15,17 +15,21 @@
  */
 package com.jd.oxygent.core.oxygent.oxy;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.jd.oxygent.core.Config;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyResponse;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 import java.util.Objects;
+import java.util.concurrent.Semaphore;
 
 /**
  * Base Tool Class - Abstract base class for all tools in the OxyGent framework
@@ -122,7 +126,15 @@ public abstract class BaseTool extends BaseOxy {
      */
     @JsonProperty("timeout")
     @Builder.Default
-    private double timeout = 60.0;
+    private double timeout = Config.getTool().getTimeout();
+
+    @JsonProperty("semaphore")
+    @Builder.Default
+    private int semaphoreCount = Config.getTool().getSemaphore();
+
+    @Getter
+    @JsonIgnore
+    private Semaphore semaphore = new Semaphore(Config.getTool().getSemaphore(), true);
 
     /**
      * Constructor - Create tool with name and description

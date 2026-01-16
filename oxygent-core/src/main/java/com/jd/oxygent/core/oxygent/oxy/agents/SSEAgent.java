@@ -31,6 +31,7 @@ import reactor.core.publisher.Flux;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -182,6 +183,23 @@ public class SSEAgent extends RemoteAgent {
     @Builder.Default
     protected long retryDelayMs = 1000;
 
+    public static final List EXCLUDED_HEADERS = List.of(
+            "host",
+            "connection",
+            "sec-ch-ua",
+            "sec-ch-ua-mobile",
+            "sec-ch-ua-platform",
+            "user-agent",
+            "referer",
+            "accept-encoding",
+            "accept-language",
+            "cache-control",
+            "sec-fetch-site",
+            "sec-fetch-mode",
+            "sec-fetch-dest",
+            "accept",
+            "content-length");
+
     /**
      * WebClient instance
      *
@@ -224,7 +242,9 @@ public class SSEAgent extends RemoteAgent {
             // Add custom HTTP headers to initialization request
             if (customHeaders != null && !customHeaders.isEmpty()) {
                 for (Map.Entry<String, String> header : customHeaders.entrySet()) {
-                    requestSpec = requestSpec.header(header.getKey(), header.getValue());
+                    if (!EXCLUDED_HEADERS.contains(header.getKey().toLowerCase())) {
+                        requestSpec = requestSpec.header(header.getKey(), header.getValue());
+                    }
                 }
                 log.debug("Added {} custom headers to organization request", customHeaders.size());
             }
@@ -338,8 +358,14 @@ public class SSEAgent extends RemoteAgent {
                     payload.put("node_id_stack", nodeIdStack.subList(0, nodeIdStack.size() - 1));
                 }
             } else {
+                payload.remove("call_stack");
+                payload.remove("node_id_stack");
                 // When not sharing call stack, set caller to user
                 payload.put("caller", "user");
+            }
+            payload.remove("arguments");
+            if (payload.get("shared_data") != null && payload.get("shared_data") instanceof Map sharedDataMap && sharedDataMap.containsKey("_headers")) {
+                sharedDataMap.remove("_headers");
             }
 
             // === Step 3: Use WebClient to handle SSE stream ===
@@ -352,187 +378,220 @@ public class SSEAgent extends RemoteAgent {
             // Use String type to avoid automatic JSON parsing, manually handle data format
             var url = this.isOxyAgent() ? getServerUrl() + "/sse/chat" : getServerUrl();
 
+            // Add custom HTTP headers
             var requestSpec = webClient.post()
                     .uri(url)           // SSE endpoint
                     .contentType(MediaType.APPLICATION_JSON)     // Request body is JSON
                     .accept(MediaType.TEXT_EVENT_STREAM)         // Accept SSE stream
                     .bodyValue(payload);                         // Send constructed payload
 
+
             // Add custom HTTP headers
             if (customHeaders != null && !customHeaders.isEmpty()) {
                 for (Map.Entry<String, String> header : customHeaders.entrySet()) {
-                    requestSpec = requestSpec.header(header.getKey(), header.getValue());
+                    if (!EXCLUDED_HEADERS.contains(header.getKey().toLowerCase())) {
+                        requestSpec = requestSpec.header(header.getKey(), header.getValue());
+                    }
                 }
                 log.debug("Added {} custom headers to SSE request", customHeaders.size());
             }
 
-            Flux<ServerSentEvent<String>> sseFlux = requestSpec
-                    .retrieve()                                  // Get response
-                    .bodyToFlux(String.class)                   // First get raw string stream
-                    .map(rawData -> {
-                        // Manually build ServerSentEvent to avoid automatic JSON parsing
-                        return ServerSentEvent.<String>builder()
-                                .data(rawData)
-                                .build();
-                    })
-                    .onErrorContinue((throwable, obj) -> {
-                        // Ignore parsing errors, continue processing subsequent data
-                        log.warn("SSE parsing warning (continuing): {}", throwable.getMessage());
-                    });
+            // === Step 3: SSE stream retry logic ===
+            int sseMaxRetries = 3;
+            long baseRetryDelay = 1000; // 1 second base delay
+            double retryMultiplier = 2.0;
+            int retryCount = 0;
+            Exception lastException = null;
 
-            StringBuilder result = new StringBuilder();
-            // === Step 4: Subscribe to SSE stream and handle events ===
-            sseFlux.subscribe(
-                    // onNext: Handle each SSE event
-                    event -> {
-                        try {
-                            Object eventData = event.data();
-                            log.info(LogUtils.ANSI_GREEN + "Received SSE event: {}" + LogUtils.ANSI_RESET_ALL, eventData);
-                            String data;
+            while (retryCount <= sseMaxRetries) {
+                try {
+                    // Build SSE flux with current retry attempt
+                    Flux<ServerSentEvent<String>> sseFlux = requestSpec
+                            .retrieve()                              // Get response
+                            .bodyToFlux(String.class)               // First get raw string stream
+                            .map(rawData -> {
+                                // Manually build ServerSentEvent to avoid automatic JSON parsing
+                                return ServerSentEvent.<String>builder()
+                                        .data(rawData)
+                                        .build();
+                            })
+                            .onErrorContinue((throwable, obj) -> {
+                                // Ignore parsing errors, continue processing subsequent data
+                                log.warn("SSE parsing warning (continuing): {}", throwable.getMessage());
+                            });
 
-                            // Now eventData should always be String type
-                            data = (String) eventData;
-
-                            // Handle special non-JSON data (such as heartbeat)
-                            if ("heartbeat".equals(data) || data.trim().isEmpty()) {
-                                log.debug("Received heartbeat or empty data, skipping: {}", data);
-                                return; // Skip heartbeat and empty data
-                            }
-
-                            // Check if end signal is received
-                            if ("done".equals(data) || "DONE".equals(data)) {
-                                log.info("Received request to terminate SSE connection: {}. {}", data, getServerUrl());
-                                latch.countDown(); // Notify main thread that processing is complete
-                                return;
-                            }
-
-                            // Handle non-empty event data
-                            if (data != null && !data.isBlank()) {
-                                Map<String, Object> eventMap;
+                    // === Step 4: Subscribe to SSE stream and handle events ===
+                    if (retryCount > 0) {
+                        log.info("SSE stream retry attempt {}/{}", retryCount, sseMaxRetries);
+                    }
+                    sseFlux.subscribe(
+                            // onNext: Handle each SSE event
+                            event -> {
                                 try {
-                                    // Try to parse as JSON object
-                                    eventMap = JsonUtils.parseObject(data, Map.class);
-                                    if (eventMap == null) {
-                                        log.debug("Received non-JSON data, skipping: {}", data);
+                                    Object eventData = event.data();
+                                    log.info(LogUtils.ANSI_GREEN + "Received SSE event: {}" + LogUtils.ANSI_RESET_ALL, eventData);
+                                    String data;
+
+                                    // Now eventData should always be String type
+                                    data = (String) eventData;
+
+                                    // Handle special non-JSON data (such as heartbeat)
+                                    if ("heartbeat".equals(data) || data.trim().isEmpty()) {
+                                        log.debug("Received heartbeat or empty data, skipping: {}", data);
+                                        return; // Skip heartbeat and empty data
+                                    }
+
+                                    // Check if end signal is received
+                                    if ("DONE".equalsIgnoreCase(data) || "[DONE]".equalsIgnoreCase(data)) {
+                                        log.info("Received request to terminate SSE connection: {}. {}", data, getServerUrl());
+                                        latch.countDown(); // Notify main thread that processing is complete
                                         return;
                                     }
-                                } catch (Exception e) {
-                                    // If not valid JSON, skip this event
-                                    log.debug("Failed to parse JSON data (skipping): {} - Error: {}", data, e.getMessage());
-                                    return;
-                                }
-//                                var type = (String) eventMap.get("type");
-                                var type = Optional.ofNullable((String) eventMap.get("type"))
-                                        .filter(s -> !s.trim().isEmpty())
-                                        .orElse((String) eventMap.get("message_type"));
 
-                                // Handle answer type events
-                                if ("answer".equals(type)) {
-                                    String content = null;
-                                    // Try to get from content field
-                                    if (eventMap.get("content") instanceof String) {
-                                        content = (String) eventMap.get("content");
-                                    } else if (eventMap.get("message") instanceof String) {
-                                        content = (String) eventMap.get("message");
-                                    }
-                                    // If content is empty, try to get from data field
-                                    else if (eventMap.get("data") != null) {
-                                        Object dataField = eventMap.get("data");
-                                        if (dataField instanceof String) {
-                                            content = (String) dataField;
-                                        } else {
-                                            // For complex data structures (such as arrays, objects), convert to JSON string
-                                            try {
-                                                content = JsonUtils.writeValueAsString(dataField);
-                                            } catch (Exception e) {
-                                                log.debug("Failed to serialize data field to JSON: {}", e.getMessage());
-                                                content = dataField.toString();
+                                    // Handle non-empty event data
+                                    if (data != null && !data.isBlank()) {
+                                        Map<String, Object> eventMap;
+                                        try {
+                                            // Try to parse as JSON object
+                                            eventMap = JsonUtils.parseObject(data, Map.class);
+                                            if (eventMap == null) {
+                                                log.debug("Received non-JSON data, skipping: {}", data);
+                                                return;
                                             }
+                                        } catch (Exception e) {
+                                            // If not valid JSON, skip this event
+                                            log.debug("Failed to parse JSON data (skipping): {} - Error: {}", data, e.getMessage());
+                                            return;
                                         }
-                                    }
+                                        //                                var type = (String) eventMap.get("type");
+                                        var type = Optional.ofNullable((String) eventMap.get("type"))
+                                                .filter(s -> !s.trim().isEmpty())
+                                                .orElse((String) eventMap.get("message_type"));
 
-                                    if (content != null) {
-                                        answer.set(content); // Update final answer
-//                                        result.append(content);
-                                    }
-                                    eventMap.put("_is_stored", false);
-                                    if (this.isSendAnswer()) {
-                                        request.sendMessage(eventMap);
-                                    }
-                                }
-                                // Handle tool call and observation type events
-                                else if ("tool_call".equals(type) || "observation".equals(type)) {
-                                    // Check caller_category and callee_category, consistent with Python logic
-                                    @SuppressWarnings("unchecked")
-                                    var contentMap = (Map<String, Object>) eventMap.get("content");
-                                    if (contentMap != null) {
-                                        var callerCategory = contentMap.getOrDefault("caller_category", "").toString();
-                                        var calleeCategory = contentMap.getOrDefault("callee_category", "").toString();
-
-                                        // Filter out user-related calls to avoid infinite loops
-                                        if (!"user".equals(callerCategory) && !"user".equals(calleeCategory)) {
-                                            // Handle call_stack merge logic (consistent with Python logic)
-                                            if (!isShareCallStack) {
-                                                @SuppressWarnings("unchecked")
-                                                var callStack = (ArrayList<Object>) contentMap.get("call_stack");
-                                                if (callStack != null && callStack.size() > 2) {
-                                                    // Merge call_stack: request.call_stack + data.content.call_stack[2:]
-                                                    // This is done to maintain the integrity of the call chain
-                                                    var newCallStack = new ArrayList<Object>(request.getCallStack());
-                                                    newCallStack.addAll(callStack.subList(2, callStack.size()));
-                                                    contentMap.put("call_stack", newCallStack);
+                                        // Handle answer type events
+                                        if ("answer".equals(type)) {
+                                            String content = null;
+                                            // Try to get from content field
+                                            if (eventMap.get("content") instanceof String) {
+                                                content = (String) eventMap.get("content");
+                                            } else if (eventMap.get("message") instanceof String) {
+                                                content = (String) eventMap.get("message");
+                                            }
+                                            // If content is empty, try to get from data field
+                                            else if (eventMap.get("data") != null) {
+                                                Object dataField = eventMap.get("data");
+                                                if (dataField instanceof String) {
+                                                    content = (String) dataField;
+                                                } else {
+                                                    // For complex data structures (such as arrays, objects), convert to JSON string
+                                                    try {
+                                                        content = JsonUtils.writeValueAsString(dataField);
+                                                    } catch (Exception e) {
+                                                        log.debug("Failed to serialize data field to JSON: {}", e.getMessage());
+                                                        content = dataField.toString();
+                                                    }
                                                 }
                                             }
-                                            // Forward event to request handler
 
+                                            if (content != null) {
+                                                answer.set(content); // Update final answer
+                                            //                                        result.append(content);
+                                            }
+                                            eventMap.put("_is_stored", false);
+                                            if (this.isSendAnswer()) {
+                                                request.sendMessage(eventMap);
+                                            }
+                                        }
+                                        // Handle tool call and observation type events
+                                        else if ("tool_call".equals(type) || "observation".equals(type)) {
+                                            // Check caller_category and callee_category, consistent with Python logic
+                                            @SuppressWarnings("unchecked")
+                                            var contentMap = (Map<String, Object>) eventMap.get("content");
+                                            if (contentMap != null) {
+                                                var callerCategory = contentMap.getOrDefault("caller_category", "").toString();
+                                                var calleeCategory = contentMap.getOrDefault("callee_category", "").toString();
+
+                                                // Filter out user-related calls to avoid infinite loops
+                                                if (!"user".equals(callerCategory) && !"user".equals(calleeCategory)) {
+                                                    // Handle call_stack merge logic (consistent with Python logic)
+                                                    if (!isShareCallStack) {
+                                                        @SuppressWarnings("unchecked")
+                                                        var callStack = (ArrayList<Object>) contentMap.get("call_stack");
+                                                        if (callStack != null && callStack.size() > 2) {
+                                                            // Merge call_stack: request.call_stack + data.content.call_stack[2:]
+                                                            // This is done to maintain the integrity of the call chain
+                                                            var newCallStack = new ArrayList<Object>(request.getCallStack());
+                                                            newCallStack.addAll(callStack.subList(2, callStack.size()));
+                                                            contentMap.put("call_stack", newCallStack);
+                                                        }
+                                                    }
+                                                    // Forward event to request handler
+                                                    request.sendMessage(eventMap);
+                                                }
+                                            }
+                                        }
+                                        // Handle other type events
+                                        else {
                                             request.sendMessage(eventMap);
                                         }
                                     }
+                                } catch (Exception e) {
+                                    log.error("Error processing SSE event: {}", e.getMessage(), e);
+                                    errorRef.set(e);
+                                    latch.countDown(); // Also notify main thread when error occurs
                                 }
-                                // Handle other type events
-                                else {
-                                    request.sendMessage(eventMap);
-                                }
+                            },
+                            // onError: Handle errors in stream
+                            error -> {
+                                log.error("SSE stream error: {}", error.getMessage(), error);
+                                errorRef.set(new RuntimeException("SSE stream error", error));
+                                latch.countDown(); // Also notify main thread on error
+                            },
+                            // onComplete: Handle when stream completes normally
+                            () -> {
+                                log.info("SSE stream completed");
+                                latch.countDown(); // Notify main thread that stream is completed
                             }
-                        } catch (Exception e) {
-                            log.error("Error processing SSE event: {}", e.getMessage(), e);
-                            errorRef.set(e);
-                            latch.countDown(); // Also notify main thread when error occurs
-                        }
-                    },
-                    // onError: Handle errors in stream
-                    error -> {
-                        log.error("SSE stream error: {}", error.getMessage(), error);
-                        errorRef.set(new RuntimeException("SSE stream error", error));
-                        latch.countDown(); // Also notify main thread on error
-                    },
-                    // onComplete: Handle when stream completes normally
-                    () -> {
-                        log.info("SSE stream completed");
-                        latch.countDown(); // Notify main thread that stream is completed
+                    );
+
+                    // === Step 5: Wait for stream processing completion and handle results ===
+                    // Wait for stream processing completion, set 300 seconds timeout
+                    boolean completed = latch.await(300, java.util.concurrent.TimeUnit.SECONDS);
+
+                    // Check if timeout occurred
+                    if (!completed) {
+                        throw new RuntimeException("SSE processing timeout");
                     }
-            );
 
-            // === Step 5: Wait for stream processing completion and handle results ===
-            // Wait for stream processing completion, set 300 seconds timeout to prevent infinite waiting
-            boolean completed = latch.await(300, java.util.concurrent.TimeUnit.SECONDS);
+                    // Check if any error occurred
+                    if (errorRef.get() != null) {
+                        throw errorRef.get();
+                    }
 
-            // Check if timeout occurred
-            if (!completed) {
-                throw new RuntimeException("SSE processing timeout");
+                    // Build success response
+                    return OxyResponse.builder()
+                            .oxyRequest(request)
+                            .state(OxyState.COMPLETED)
+                            .output(answer.get())
+                            .build();
+
+                } catch (Exception e) {
+                    lastException = e;
+                    retryCount++;
+                    
+                    // If this is not the last retry, wait before next attempt
+                    if (retryCount <= sseMaxRetries) {
+                        long delay = (long) (baseRetryDelay * Math.pow(retryMultiplier, retryCount - 1));
+                        log.warn("SSE stream failed, retrying in {}ms... ({}/{})", delay, retryCount, sseMaxRetries);
+                        Thread.sleep(delay);
+                    } else {
+                        log.error("SSE stream failed after {} retries", sseMaxRetries);
+                    }
+                }
             }
 
-            // Check if any error occurred
-            if (errorRef.get() != null) {
-                throw errorRef.get();
-            }
-
-            // Build success response
-            return OxyResponse.builder()
-                    .oxyRequest(request)
-                    .state(OxyState.COMPLETED)
-                    .output(answer.get())
-                    .build();
+            // If we've exhausted all retries, throw the last exception
+            throw new RuntimeException("SSE stream failed after all retries", lastException);
 
         } catch (Exception e) {
             // === Exception handling ===
@@ -540,5 +599,4 @@ public class SSEAgent extends RemoteAgent {
             throw e;
         }
     }
-
 }
