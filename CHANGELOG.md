@@ -5,74 +5,30 @@ All notable changes to this project will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- Added support for dynamic registration of `oxy`
+- Added Prompt management interface, supporting online Prompt modification, see [DemoLivePrompt.java](./oxygent-core/src/main/java/com/jd/oxygent/core/oxygent/samples/examples/liveprompt/DemoLivePrompt.java)
+- Create or update conversation evaluations, supporting additional comments
+- Added oxy.BaseBank for standardizing agent input information, see [bank](./oxygent-core/src/main/java/com/jd/oxygent/core/oxygent/samples/examples/banks)
+- Added user feedback interface /feedback for implementing human-in-the-loop, see [DemoHumanInTheLoop.java](./oxygent-core/src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoHumanInTheLoop.java)
+- Added stream_end message as streaming message end identifier
+- Support for batch storage of stream messages
+- Standardized SSE message fields id, event, data
+- SSEOxyGent passes through headers
+- Added front-end streaming output capability
+- Added custom function for processing message body in mas method, supporting adding/deleting body fields, see [DemoMasFunction](./oxygent-core/src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoMasFunction.java)
 
----
-
-## [1.0.10.4] - 2026-01-15
-
-### Added
-- Added oxy.BaseLLM parameter to support custom multimodal base64 prefixes.
-- Added func_process_message method to the MAS class for unified message processing, refer to [./examples/backend/demo_process_message.py](./examples/backend/demo_process_message.py)
-- Added stream_end message as an indicator for the end of streaming messages.
-- Stream messages now support batch storage.
+### Changed
+- Added oxy.BaseLLM parameter to support custom multimodal base64 prefix
+- MAS class added func_process_message method for unified message processing, see [DemoProcessMessage.java](./oxygent-core/src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoProcessMessage.java)
+- Modified message table structure, added fields
+- When storing in history table, memory's answer field is forcibly converted to str
+- Changed LLM parameter stream default value to True
+- Added Agent name field to think messages
+- Changed Config.getServer().getWelcomeMessage() to Config.getAgent().getWelcomeMessage()
+- Optimized ObjectUtils.deepCopy method performance
+- Refactored RemoteEs search method to enhance readability
+- Added concurrency, timeout, retry, delay and other parameters to large model parameters
 
 ### Fixed
-- When the send_msg_key parameter of the chat_with_agent function is empty, messages will not be sent.
+- When the send_msg_key parameter is empty in the chat_with_agent function, modified to not send messages
 
 ---
-
-## [1.0.9.2] - 2025-12-09
-### Added
-
-### Changed
-- Modified the structure of the message table, added new fields.
-
----
-
-## [1.0.9.1] - 2025-12-04
-### Added
-- Added pre-logging of payloads for easier troubleshooting.
-- Standardized SSE message fields: id, event, data.
-- SSEOxyGent now forwards headers transparently.
-
-### Changed
-- When storing in the history table, the answer field in memory is forcibly converted to a string.
-
----
-
-## [1.0.8] - 2025-11-14
-
-### Added
-- Added streaming output capability to the frontend
-- Added Agent name field to think messages
-
-### Changed
-- LChanged the default value of the LLM parameter stream to True
-
----
-## [1.0.6.3] - 2025-10-15
-
-### Added
-- Added fine-grained message storage, refer to [./examples/advanced/demo_save_message.py](./examples/advanced/demo_save_message.py)
-
-### Changed
-- Updated examples. For details, see [./examples](./examples)
-
----
-
-## [1.0.6.2] - 2025-10-09
-
-### Added
-- Added an example of a custom agent input schema, refer to [./examples/advanced/demo_custom_agent_input_schema.py](./examples/advanced/demo_custom_agent_input_schema.py)
-
-### Changed
-- Renamed Vearch configuration parameter `tool_df_space_name` to `tool_space_name`
-- Modified the names of environment variables used in `config.json`
-
----
-
-## [1.0.0] - 2025-12-25
-
-### Added
-- Initial JDOxyGent4J

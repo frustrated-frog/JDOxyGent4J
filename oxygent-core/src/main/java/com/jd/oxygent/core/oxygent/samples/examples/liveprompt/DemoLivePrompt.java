@@ -15,6 +15,7 @@
  */
 package com.jd.oxygent.core.oxygent.samples.examples.liveprompt;
 
+import com.jd.oxygent.core.Config;
 import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
 import com.jd.oxygent.core.oxygent.oxy.agents.ChatAgent;
 import com.jd.oxygent.core.oxygent.oxy.agents.ReActAgent;
@@ -100,6 +101,7 @@ public class DemoLivePrompt {
     }
 
     public static void main(String[] args) throws Exception {
+        Config.getLivePrompt().setUseEsPolling(true);
         var currentClassName = Thread.currentThread().getStackTrace()[1].getClassName();
         GlobalDefaultOxySpaceMapping.searchCurrentThreadStackAnnotationOxySpaceName(currentClassName);
         ServerApp.main(args);
