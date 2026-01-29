@@ -1,61 +1,93 @@
 # JDOxyGent4J 示例索引（按目录分类）
 
 本文档仅保留示例名称与能力描述，按目录分组，便于快速查阅。  
-samples所在位置：[samples/](src/main/java/com/jd/oxygent/core/oxygent/samples/)
+samples所在位置：[samples/](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/)
 
 ## agent（基础与多智能体架构）
 
-| 示例 | 能力 |
-| - | - |
-| demo_single_agent | 最简单的单智能体系统；单个 ReActAgent 调用工具 |
-| demo_react_agent | ReAct 推理循环：思考 → 行动 → 观察 → 再思考 |
-| demo_chat_agent_stream | 对话型智能体 + SSE 流式输出；适合聊天场景 |
-| demo_workflow_agent | 使用 WorkflowAgent 执行工作流；显式控制顺序与数据流 |
-| demo_heterogeneous_agents | 异构智能体协作（ReAct/Chat/MCP）；各司其职协同工作 |
-| demo_hierarchical_agents | 分层 master-sub 架构；权限管理与调用链路追踪 |
-| demo_rag_agent | 检索增强生成（RAG）；向量检索增强回答 |
+| 示例                                                                                                                        | 能力                                         |
+|---------------------------------------------------------------------------------------------------------------------------|--------------------------------------------|
+| [DemoSingleAgent](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/agent/DemoSingleAgent.java)                | 最简单的单智能体系统；单个 ReActAgent 调用工具              |
+| [DemoReactAgent](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/agent/DemoReactAgent.java)                  | ReAct 推理循环：思考 → 行动 → 观察 → 再思考              |
+| [DemoChatAgentStream](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/agent/DemoChatAgentStream.java)        | 对话型智能体 + SSE 流式输出；适合聊天场景                   |
+| [DemoWorkflowAgent](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/agent/DemoWorkflowAgent.java)            | 使用 WorkflowAgent 执行工作流；显式控制顺序与数据流          |
+| [DemoHeterogeneousAgents](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/agent/DemoHeterogeneousAgents.java) | 异构智能体协作（ReAct/Chat/MCP）；各司其职协同工作           |
+| [DemoHierarchicalAgents](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/agent/DemoHierarchicalAgents.java)  | 分层 master-sub 架构；权限管理与调用链路追踪               |
+| [DemoRagAgent](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/agent/DemoRagAgent.java)                      | 检索增强生成（RAG）；向量检索增强回答                       |
+| [DemoSseAgent](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/agent/DemoSseAgent.java)                      | 访问SSE流式输出的server                           |
+| [DemoTeamSizeAgent.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/agent/DemoTeamSizeAgent.java)                     | 在智能体中自定义funcProcessInput和funcProcessOutput方法 |
+| [EvaluateAndEvolveDemo.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/agent/EvaluateAndEvolveDemo.java)                     | 通过数据处理与分析来评估并提升智能体的性能                      |
+| [ParallelDemo.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/agent/ParallelDemo.java)                    | 智能体并行执行                                    |
 
 ## tools（工具与 MCP 集成）
 
-| 示例 | 能力 |
-| - | - |
-| demo_functionhub | 使用 FunctionHub 将普通函数注册为工具；参数类型校验 |
-| demo_functionhub_annotation | 注解式工具注册；简化工具声明与注入 |
-| demo_mcp | MCP 协议工具集成（Stdio/SSE/Streamable）；支持本地与远程 |
+| 示例                                                                                                                             | 能力                                                   |
+|--------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------|
+| [DemoFunctionHub](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/tools/DemoFunctionHub.java)                     | 使用 FunctionHub 将普通函数注册为工具；参数类型校验                     |
+| [DemoFunctionHubAnnotation](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/tools/DemoFunctionHubAnnotation.java) | 注解式工具注册；简化工具声明与注入                                    |
+| [DemoMCP](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/tools/DemoMCP.java)                                     | MCP 协议工具集成（Stdio/SSE/Streamable）；支持本地与远程             |
+| [DemoMCPToolAuthorization](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/tools/DemoMCPToolAuthorization.java)                                     | MCP 协议工具集成（Stdio/SSE/Streamable）；支持本地与远程，Header带认证信息 |
 
 ## advanced（高级功能）
 
-| 示例 | 能力 |
-| - | - |
-| advanced/demo_continue_exec | 断点续传与重新生成；从指定节点恢复执行 |
-| demo_custom_agent_input_schema | 自定义输入结构；支持复杂结构化参数传递 |
-| demo_multimodal | 多模态输入（图片/视频/URL/Base64）；启用 is_multimodal_supported |
-| demo_multimodal_transfer | 智能体间多模态数据传递；自动生成可访问链接 |
-| demo_send_message_from_tool | 工具内主动发送消息；实时进度反馈与可观测性 |
-| demo_trust_mode | 信任模式（原始输出）；跳过 LLM 二次解析与润色 |
+| 示例                                                                                                                                  | 能力                                                 |
+|-------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------|
+| [DemoContinueExec](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/advanced/DemoContinueExec.java)                     | 断点续传与重新生成；从指定节点恢复执行                                |
+| [DemoCustomAgentInputSchema](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/advanced/DemoCustomAgentInputSchema.java) | 自定义输入结构；支持复杂结构化参数传递                                |
+| [DemoMultimodal](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/advanced/DemoMultimodal.java)                         | 多模态输入（图片/视频/URL/Base64）；启用 is_multimodal_supported |
+| [DemoMultimodalNew.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/advanced/DemoMultimodalNew.java)                | 多模态输入（图片/视频/URL/Base64）；图片分析                       |
+| [DemoMultimodalTransfer](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/advanced/DemoMultimodalTransfer.java)         | 智能体间多模态数据传递；自动生成可访问链接                              |
+| [DemoSendMessageFromTool](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/advanced/DemoSendMessageFromTool.java)       | 工具内主动发送消息；实时进度反馈与可观测性                              |
+| [DemoTrustMode](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/advanced/DemoTrustMode.java)                           | 信任模式（原始输出）；跳过 LLM 二次解析与润色                          |
 
 ## flows（流程编排）
 
-| 示例 | 能力 |
-| - | - |
-| plan_and_solve_demo | Plan-and-Solve 两阶段：规划与执行；支持 enable_replanner |
-| reflexion_agent_demo | Reflexion 反思机制；自我评估与改进响应质量 |
+| 示例                                                                                                              | 能力 |
+|-----------------------------------------------------------------------------------------------------------------| - |
+| [DemoPlanAndSolve](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/flows/DemoPlanAndSolve.java)    | Plan-and-Solve 两阶段：规划与执行；支持 enable_replanner |
+| [DemoReflexionFlow](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/flows/DemoReflexionFlow.java) | Reflexion 反思机制；自我评估与改进响应质量 |
 
 ## backend（路由、附件、并发、配置、启动与日志）
 
-| 示例 | 能力 |
-| - | - |
-| demo_add_router | 动态路由注册；扩展 Web 服务 API 端点 |
-| demo_attachment | 附件处理；支持图片/视频上传与传递 |
-| demo_batch_and_semaphore | 批处理与并发控制；信号量限制并发请求数 |
-| demo_config | 配置系统；数据库/LLM/环境变量管理，支持多环境 |
-| demo_data_scope | 数据作用域管理：请求/会话/组级别存储与访问 |
-| demo_global_data | 全局数据共享；在所有智能体间同步状态 |
-| demo_launch_mas | MAS 系统启动；CLI/Web/编程三种模式初始化 |
-| demo_logger_setup | 日志系统配置；自定义格式与级别，追踪 trace_id/node_id |
+| 示例                                                                                                                              | 能力                                        |
+|---------------------------------------------------------------------------------------------------------------------------------|-------------------------------------------|
+| [DemoAddRouter](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoAddRouter.java)                        | 动态路由注册；扩展 Web 服务 API 端点                   |
+| [DemoAttachment](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoAttachment.java)                      | 附件处理；支持图片/视频上传与传递                         |
+| [DemoBatchAndSemaphore](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoBatchAndSemaphore.java)        | 批处理与并发控制；信号量限制并发请求数                       |
+| [DemoConfig](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoConfig.java)                              | 配置系统；数据库/LLM/环境变量管理，支持多环境                 |
+| [DemoCustomHeader.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoCustomHeader.java)               | 自定义大模型请求的header数据                         |
+| [DemoDataScope](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoDataScope.java)                        | 数据作用域管理：请求/会话/组级别存储与访问                    |
+| [DemoGlobalData](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoGlobalData.java)                      | 全局数据共享；在所有智能体间同步状态                        |
+| [DemoHumanInTheLoop.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoHumanInTheLoop.java)           | 手动发送反馈，阻塞获取                               |
+| [DemoLaunchMas](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoLaunchMas.java)                        | MAS 系统启动；CLI/Web/编程三种模式初始化                |
+| [DemoLoggerSetup](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoLoggerSetup.java)                    | 日志系统配置；自定义格式与级别，追踪 trace_id/node_id       |
+| [DemoMasFunction.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoMasFunction.java)                 | 自定义Mas.funcProcessMessageBody方法，用于自定义处理消息 |
+| [DemoProcessLlmException.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoProcessLlmException.java) | 自定义大模型报错时的方法，用于自定义处理异常                    |
+| [DemoProcessMessage.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoProcessMessage.java)           | 自定义Mas.funcProcessMessage方法，用于自定义处理消息体字段  |
+| [DemoSaveMessage.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/backend/DemoSaveMessage.java)                 | 自定义Mas.funcProcessInput方法，用于自定义消息的保存和发送策略 |
 
 ## distributed（分布式与多节点协同）
 
-| 示例 | 能力 |
-| - | - |
-| demo_distributed_mas | 分布式与多节点协同；支持 Python/Java 互相调用 |
+| 示例                                                                                                             | 能力 |
+|----------------------------------------------------------------------------------------------------------------| - |
+| [AppMasterAgent](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/distributed/AppMasterAgent.java) | 分布式与多节点协同；支持 Python/Java 互相调用 |
+| [AppMathAgent](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/distributed/AppMathAgent.java)     | 分布式与多节点协同；支持 Python/Java 互相调用 |
+| [AppTimeAgent](./src/main/java/com/jd/oxygent/core/oxygent/samples/examples/distributed/AppTimeAgent.java)   | 分布式与多节点协同；支持 Python/Java 互相调用 |
+
+## mcptools (MCP工具)
+| 示例 | 能力                                         |
+|----|--------------------------------------------|
+|  [DemoBrowser.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/mcptools/DemoBrowser.java)  | 网页自动抓取，Browser Use能力，使用chrome-devtools-mcp |
+
+## llms (大模型)
+| 示例                                                                                                                           | 能力                                      |
+|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|
+| [DemoDisableSystemPrompt.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/llms/DemoDisableSystemPrompt.java) | 大模型禁用系统提示词                              |
+| [DemoHttpVersion.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/llms/DemoHttpVersion.java)                 | 大模型网关在不支持http/2的情况下，需要指定http版本为http/1.1 |
+
+## banks (资产库)
+
+| 示例                                                                                                                           | 能力                                      |
+|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------|
+| [DemoDisableSystemPrompt.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/llms/DemoDisableSystemPrompt.java) | 大模型禁用系统提示词                              |
+| [DemoHttpVersion.java](src/main/java/com/jd/oxygent/core/oxygent/samples/examples/llms/DemoHttpVersion.java)                 | 大模型网关在不支持http/2的情况下，需要指定http版本为http/1.1 |

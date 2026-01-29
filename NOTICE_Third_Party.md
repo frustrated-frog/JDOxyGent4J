@@ -380,6 +380,12 @@ Non-standard license
 Refer to the upstream project LICENSE for exact terms: https://github.com/virtuald/curvesapi
 
 ================
+oxygent-core: junit
+
+Eclipse Public License - v 2.0
+See https://github.com/junit-team/junit-framework/blob/main/LICENSE.md
+
+================
 Notes
 
 This NOTICE lists third-party components used in the multi-module project (oxygent-core, oxygent-infra, oxygent-studio) and their licenses. Links are provided for reference; refer to official sources for authoritative license terms. If dependencies change (add/remove/upgrade), please update this file accordingly.

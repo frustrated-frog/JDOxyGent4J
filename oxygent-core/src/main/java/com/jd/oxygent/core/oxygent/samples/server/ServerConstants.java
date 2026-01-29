@@ -1,5 +1,7 @@
 package com.jd.oxygent.core.oxygent.samples.server;
 
+import com.jd.oxygent.core.Config;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -7,11 +9,13 @@ import java.util.Set;
 
 public final class ServerConstants {
 
-    public static final int DEFAULT_PORT = 8888;
+    public static final int DEFAULT_PORT = getPort(Config.getServer().getPort(),8888);
 
     public static final String DEFAULT_HOST_NAME = "localhost";
 
     public static final String DEFAULT_TOMCAT_BASE_TMP_DIR = "tomcat_oxygent";
+
+    public static String DEFAULT_API_ENDPOINT_SCANNER_PATH = "";
 
     public static final String DEFAULT_CONTEXT_PATH = "";
 
@@ -47,7 +51,6 @@ public final class ServerConstants {
             "default.html"
     );
 
-
     public static final Map<String, String> ROUTE_MAPPING = new HashMap<>() {{
         this.put("/", "RouteServlet");
         this.put("/check_alive", "RouteServlet");
@@ -64,6 +67,12 @@ public final class ServerConstants {
         this.put("/view", "RouteServlet");
         this.put("/call", "RouteServlet");
         this.put("/upload", "RouteServlet");
+        this.put("/feedback", "RouteServlet");
+        this.put("/api/prompts/*", "RouteServlet");
+        this.put("/get_agents", "RouteServlet");
+        this.put("/rating/*", "RouteServlet");
+        this.put("/history_with_ratings", "RouteServlet");
+        this.put("/analytics/ratings", "RouteServlet");
     }};
     public static final List<String> WEBAPP_RESOURCE_DIR_PATHS = List.of(
             "webapp",
@@ -89,4 +98,12 @@ public final class ServerConstants {
             "src/main/resources/static/web/",
             "src/main/static/web/"
     );
+
+    public static int getPort(int port, int defaultValue) {
+        if(port<1024){
+            return defaultValue;
+        }else{
+            return port;
+        }
+    }
 }

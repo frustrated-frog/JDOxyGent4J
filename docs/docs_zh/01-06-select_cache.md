@@ -13,6 +13,7 @@ oxygent:
 ```
 
 ## Redis
+
 `Redis`是基于第三缓存服务存储消息，流式输出完消息后释放信息，缓存方式您可以使用`Redis`方式，配置MAS进行消息存储的工作，配置如下
 
 ```yaml
@@ -28,6 +29,7 @@ oxygent:
 ```
 
 ## 本地Docker启动Redis
+
 本地开发便于快速启动Redis服务，命令参数如下
 
 ```bash
@@ -35,5 +37,5 @@ docker run --name my-redis -d -p 6379:6379 redis redis-server --requirepass you_
 ```
 
 [上一章：如何选择智能体](./01-05-select_agent.md)
-[下一章：注册一个工具](./02-01-register_single_tool.md)
+[下一章：如何使用动态提示词（Live Prompts）](./01-07-live_prompt.md)
 [回到首页](./readme.md)

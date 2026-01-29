@@ -26,13 +26,15 @@ public class CustomWorkflow extends BaseFlow {
         );
         System.out.println("--- Current time --- : " + timeResponse.getOutput());
 
+        Memory memory = new Memory();
+        memory.setMessages(Arrays.asList(
+                Message.systemMessage("You are a helpful assistant."),
+                Message.userMessage("Hello")
+        ));
         var llmResponse = oxyRequest.call(
                 "default_llm",
                 Map.of(
-                    "messages", Arrays.asList(
-                        Map.of("role", "system", "content", "You are a helpful assistant."),
-                        Map.of("role", "user", "content", "Hello!")
-                    ),
+                    "messages", memory,
                     "llm_params", Map.of("temperature", 0.6)
                 )
         );

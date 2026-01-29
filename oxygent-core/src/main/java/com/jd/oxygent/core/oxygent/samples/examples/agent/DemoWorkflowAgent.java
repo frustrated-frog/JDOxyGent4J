@@ -119,8 +119,5 @@ public class DemoWorkflowAgent {
 
         Map<String, Object> arguments = new HashMap<>(Map.of("query", "Please calculate the 20 positions of Pi", "request_id", CommonUtils.generateShortUUID()));
         mas.chatWithAgent(arguments);
-
-//        GlobalDefaultOxySpaceMapping.searchCurrentThreadStackAnnotationOxySpaceName(Thread.currentThread().getStackTrace()[1].getClassName());
-//        OpenOxySpringBootApplication.main(args);
     }
 }

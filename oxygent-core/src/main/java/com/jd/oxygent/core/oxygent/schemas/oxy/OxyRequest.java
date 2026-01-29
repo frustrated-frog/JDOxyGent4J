@@ -21,7 +21,10 @@ import com.github.f4b6a3.uuid.UuidCreator;
 import com.jd.oxygent.core.Config;
 import com.jd.oxygent.core.Mas;
 import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
+import com.jd.oxygent.core.oxygent.oxy.agents.LocalAgent;
+import com.jd.oxygent.core.oxygent.schemas.SSEMessage;
 import com.jd.oxygent.core.oxygent.utils.JsonUtils;
+import com.jd.oxygent.core.oxygent.utils.StringUtils;
 import lombok.*;
 
 import java.lang.reflect.Field;
@@ -29,6 +32,10 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -236,6 +243,20 @@ public class OxyRequest implements Cloneable {
     @JsonProperty("is_save_history")
     @Builder.Default
     private boolean isSaveHistory = true;
+
+    /**
+     * Whether to send message
+     */
+    @JsonProperty("is_send_message")
+    @Builder.Default
+    private boolean isSendMessage = true;
+
+    /**
+     * whether async storage is used
+     */
+    @JsonProperty("is_async_storage")
+    @Builder.Default
+    private boolean isAsyncStorage = true;
 
     /**
      * Parallel execution ID, used to identify parallel execution task groups
@@ -558,17 +579,29 @@ public class OxyRequest implements Cloneable {
      * <p>Send message to Redis queue for inter-system communication. Messages are routed
      * to corresponding processing queues based on current trace ID.</p>
      *
-     * @param message message content to send, cannot be null or empty
+     * @param sseMessage message content to send, cannot be null or empty
      */
-    public void sendMessage(Map<String, Object> message) {
-        if (this.mas != null && message != null && !message.isEmpty()) {
+    public void sendMessage(SSEMessage sseMessage) {
+        if (isSendMessage && this.mas != null && sseMessage != null && sseMessage.getData() != null) {
             var redisKey = mas.getMessagePrefix() + ":" + mas.getName() + ":" + this.getCurrentTraceId();
-            this.mas.sendMessage(message, redisKey);
+            this.mas.sendMessage(sseMessage, redisKey, this);
         }
     }
 
+    /**
+     * Send message to current MAS system
+     *
+     * <p>Send message to Redis queue for inter-system communication. Messages are routed
+     * to corresponding processing queues based on current trace ID.</p>
+     *
+     * @param message message content to send, cannot be null or empty
+     */
+    public void sendMessage(Map<String, Object> message) {
+        this.sendMessage(new SSEMessage((String) message.get("event"), message));
+    }
+
     public void breakTask() {
-        this.sendMessage(Map.of("event", "close", "data", "done"));
+        this.sendMessage(new SSEMessage("close", Map.of("event", "close", "data", "done")));
         CompletableFuture<?> completableFuture = (CompletableFuture<?>) this.mas.getActiveTasks().get(this.getCurrentTraceId());
         if (completableFuture != null) {
             completableFuture.cancel(true);
@@ -698,7 +731,8 @@ public class OxyRequest implements Cloneable {
         if (!"user".equals(oxyRequest.getCallerCategory())
                 && oxy.isPermissionRequired()
                 && !(callerOxy.getPermittedToolNameList().contains(oxyName)
-                || callerOxy.getExtraPermittedToolNameList().contains(oxyName))) {
+                || callerOxy.getExtraPermittedToolNameList().contains(oxyName)
+                || callerOxy.getPermittedOxy().contains(oxyName))) {
 
             logger.severe(String.format(
                     "No permission for oxy: %s, caller: %s, trace_id=%s, node_id=%s",
@@ -720,7 +754,19 @@ public class OxyRequest implements Cloneable {
             if (args != null) {
                 args.put("app_name", Config.getAppName());
                 args.put("agent_name", callerOxy.getName());
+                args.put("top_k", ((LocalAgent)callerOxy).getTopKTools());
                 args.put("vearch_client", this.getMas().getVearchClient());
+            }
+        }
+
+        Map<String,Object> systemArgDict = new HashMap<String,Object>() {{
+                this.put("agent_pin",oxyRequest.caller);
+                this.put("user_pin",oxyRequest.getGroupData().getOrDefault("user_pin",""));
+        }};
+
+        for (String systemArg : oxy.getSystemArgs()) {
+            if(!oxyRequest.getArguments().containsKey(systemArg)){
+                oxyRequest.getArguments().put(systemArg,systemArgDict.get(systemArg));
             }
         }
         try {
@@ -766,6 +812,13 @@ public class OxyRequest implements Cloneable {
         }
     }
 
+
+    public void callAsync(Map<String, Object> kwargs){
+        CompletableFuture<Void> completableFuture = CompletableFuture.runAsync(() -> {
+            this.call(kwargs);
+        });
+        this.mas.getBackgroundTasks().add(completableFuture);
+    }
     /**
      * Start executing the specified callee and return execution result
      *
@@ -851,4 +904,36 @@ public class OxyRequest implements Cloneable {
         this.mas.getGlobalData().put(key, value);
     }
 
+    /**
+     * blocking get feedback stream
+     * @param channelId
+     * @return
+     */
+    public String getFeedbackStream(String channelId) {
+        if (channelId == null) {
+            channelId = this.currentTraceId;
+        }
+        if (!mas.feedbackDict.containsKey(channelId)) {
+            mas.feedbackDict.put(channelId, new LinkedBlockingQueue<>());
+            if (!mas.channelIdDict.containsKey(currentTraceId)) {
+                mas.channelIdDict.put(currentTraceId, new LinkedList<>());
+            }
+            mas.channelIdDict.get(currentTraceId).add(channelId);
+        }
+        try {
+            LinkedBlockingQueue<String> feedbackQueue = mas.feedbackDict.get(channelId);
+            StringBuilder feedback = new StringBuilder();
+            String temp = null;
+            while (true) {
+                temp = feedbackQueue.take(); // blocking get
+                if ("".equals(temp)) { // stream end symbol
+                    return feedback.toString();
+                } else {
+                    feedback.append(temp);
+                }
+            }
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

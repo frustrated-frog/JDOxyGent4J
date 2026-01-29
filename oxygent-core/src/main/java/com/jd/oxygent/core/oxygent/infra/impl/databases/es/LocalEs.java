@@ -18,6 +18,7 @@ package com.jd.oxygent.core.oxygent.infra.impl.databases.es;
 import com.jd.oxygent.core.oxygent.infra.databases.BaseDB;
 import com.jd.oxygent.core.oxygent.infra.databases.BaseEs;
 import com.jd.oxygent.core.oxygent.utils.FileUtils;
+import com.jd.oxygent.core.oxygent.utils.ObjectUtils;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -368,6 +369,12 @@ public class LocalEs extends BaseDB implements BaseEs {
         docs = filterDocs(docs, (Map<String, Object>) body.get("query"));
         docs = sortDocs(docs, (List<Map<String, Object>>) body.get("sort"));
 
+        // Apply _source filtering if specified
+        Object sourceFields = body.get("_source");
+        if (sourceFields != null && sourceFields instanceof List) {
+            docs = applySourceFiltering(docs, (List) sourceFields);
+        }
+
         int size = (Integer) body.getOrDefault("size", 10);
         List<Map<String, Object>> limitedDocs = docs.stream()
                 .limit(size)
@@ -379,6 +386,94 @@ public class LocalEs extends BaseDB implements BaseEs {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("hits", hits);
         return result;
+    }
+
+    /**
+     * Filter _source fields to only include specified fields.
+     * @param docs List of documents with _source fields
+     * @param sourceFields List of fields to include in _source
+     * @return Filtered list of documents
+     */
+    public static List<Map<String, Object>> applySourceFiltering(
+            List<Map<String, Object>> docs,
+            List<String> sourceFields) {
+        List<Map<String, Object>> filteredDocs = new ArrayList<>();
+        for (Map<String, Object> doc : docs) {
+            // Create a deep copy of the document
+            Map<String, Object> filteredDoc = new HashMap<>(doc); // ObjectUtils.deepCopy(doc);
+            // Get the original _source
+            @SuppressWarnings("unchecked")
+            Map<String, Object> originalSource = (Map<String, Object>) doc.getOrDefault("_source", new HashMap<>());
+            // Create filtered _source
+            Map<String, Object> filteredSource = new HashMap<>();
+            for (String field : sourceFields) {
+                if (originalSource.containsKey(field)) {
+                    filteredSource.put(field, originalSource.get(field));
+                }
+            }
+            // Update the _source in filtered document
+            filteredDoc.put("_source", filteredSource);
+            filteredDocs.add(filteredDoc);
+        }
+        return filteredDocs;
+    }
+
+    @Override
+    public Map<String, Object> delete(String indexName, String docId) {
+        Path dataPath = FileUtils.getIndexPath(dataDir, indexName);
+        Path backupPath = Paths.get(dataPath.toString() + ".bak");
+
+        ReentrantLock lock = locks.computeIfAbsent(indexName, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            // --- load existing data ---
+            Map<String, Object> data = FileUtils.readJsonSafe(dataDir, dataPath);
+
+            if (data == null) { // unrecoverable corruption; try backup once
+                if (Files.exists(backupPath)) {
+                    try {
+                        Files.move(backupPath, dataPath, StandardCopyOption.REPLACE_EXISTING);
+                        data = FileUtils.readJsonSafe(dataDir, dataPath);
+                    } catch (IOException e) {
+                        logger.warning("Failed to restore from backup: " + e.getMessage());
+                    }
+                }
+            }
+
+            if (data == null) {
+                // still corrupted – preserve original file, switch to fresh store
+                Path corruptPath = Paths.get(dataPath.toString() + ".corrupt");
+                try {
+                    Files.move(dataPath, corruptPath, StandardCopyOption.REPLACE_EXISTING);
+                    logger.severe("Index " + indexName + " is corrupted – moved to " + corruptPath);
+                } catch (IOException e) {
+                    logger.severe("Failed to move corrupted file: " + e.getMessage());
+                }
+                data = new LinkedHashMap<>();
+            }
+
+            // --- apply mutation ---
+            data.remove(docId);
+
+            // --- backup & persist ---
+            try {
+                if (Files.exists(dataPath)) {
+                    Files.move(dataPath, backupPath, StandardCopyOption.REPLACE_EXISTING);
+                }
+                FileUtils.writeJsonAtomic(dataDir, dataPath, data);
+            } catch (IOException e) {
+                logger.severe("Failed to persist data: " + e.getMessage());
+                throw new RuntimeException(e);
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("_id", docId);
+            result.put("result", "deleted");
+            return result;
+
+        } finally {
+            lock.unlock();
+        }
     }
 
     // ------------------------------------------------------------------
@@ -499,6 +594,24 @@ public class LocalEs extends BaseDB implements BaseEs {
             @SuppressWarnings("unchecked")
             Map<String, Object> source = (Map<String, Object>) doc.get("_source");
             return values.contains(source.get(key));
+        }
+
+        // Handle match condition
+        if (condition.containsKey("match")) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> matchMap = (Map<String, Object>) condition.get("match");
+            Map.Entry<String, Object> matchEntry = matchMap.entrySet().iterator().next();
+            String field = matchEntry.getKey();
+            String matchValue = String.valueOf(matchEntry.getValue()).toLowerCase();
+            String fieldValue;
+            if ("_id".equals(field)) {
+                fieldValue = String.valueOf(doc.get("_id"));
+            } else {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> source = (Map<String, Object>) doc.getOrDefault("_source", Map.of());
+                fieldValue = String.valueOf(source.getOrDefault(field, ""));
+            }
+            return fieldValue.toLowerCase().contains(matchValue);
         }
 
         return false;
@@ -633,4 +746,35 @@ public class LocalEs extends BaseDB implements BaseEs {
         // Nothing to clean up
     }
 
+    @Override
+    public Map<String, Object> deleteIndex(String indexName) {
+        if (indexName == null || indexName.trim().isEmpty()) {
+            throw new IllegalArgumentException("indexName and body must not be empty");
+        }
+
+        try {
+            // 2) create empty index *only if it does not exist* – avoids wiping logs
+            Path indexPath = FileUtils.getIndexPath(dataDir, indexName);
+            if (Files.exists(indexPath)) {
+                FileUtils.delete(indexPath);
+            }
+
+            Map<String, Object> result = new LinkedHashMap<>();
+            result.put("acknowledged", true);
+            return result;
+        } catch (IOException e) {
+            logger.severe("Failed to delete index: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * locales do ont need refresh index
+     * @param indexName
+     * @return
+     */
+    @Override
+    public Map<String, Object> refreshIndex(String indexName) {
+        return Map.of("acknowledged", true);
+    }
 }

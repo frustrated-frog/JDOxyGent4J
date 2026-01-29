@@ -159,7 +159,7 @@ public final class RecursivePackageInstantiator {
                     // Check if it's within the base package and is a .class file
                     if (entryName.startsWith(basePackage.replace('.', '/')) && entryName.endsWith(className + ".class")) {
                         // Convert to full class name
-                        String fullClassName = entryName.replace('/', '.').substring(0, entryName.length() - 6); // 去掉 .class
+                        String fullClassName = entryName.replace('/', '.').substring(0, entryName.length() - 6); // Remove .class
                         try {
                             return Class.forName(fullClassName);
                         } catch (ClassNotFoundException ignored) {

@@ -38,6 +38,7 @@ public class DemoMultimodal {
                         .maxImagePixels(10000000)
                         .isMultimodalSupported(true)
                         .isConvertUrlToBase64(true)
+                        .base64ImagePrefix("data:image/jpeg")
                         .timeout(30)
                         .build(),
                 ChatAgent.builder()

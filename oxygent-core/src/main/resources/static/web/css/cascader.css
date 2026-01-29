@@ -1,4 +1,4 @@
-/* Cascader container */
+/* 级联选择器容器 */
 * {
     box-sizing: border-box;
 }
@@ -6,7 +6,7 @@
     position: relative;
 }
 
-/* Input box styles */
+/* 输入框样式 */
 .cascader-input {
     width: 69px;
     height: 42px;
@@ -43,7 +43,7 @@
     transform: rotate(180deg);
 }
 
-/* Dropdown menu container */
+/* 下拉菜单容器 */
 .cascader-dropdown {
     position: absolute;
     top: 100%;
@@ -60,7 +60,7 @@
     display: block;
 }
 
-/* Cascader menu styles */
+/* 级联菜单样式 */
 .cascader-menus {
     display: flex;
     min-height: 180px;

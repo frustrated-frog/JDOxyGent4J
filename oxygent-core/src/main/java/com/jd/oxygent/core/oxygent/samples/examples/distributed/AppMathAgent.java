@@ -54,9 +54,9 @@ public class AppMathAgent {
 
 //                mac or linux usage (mcp_servers directory points to python mcp server)
                 new StdioMCPClient("math_tools", "uv", Arrays.asList("--directory", "/Users/{username}/Documents/git2024/OxyGent/mcp_servers/", "run", "math_tools.py")),
-                //windows 写法  (mcp_servers目录指向python mcp server)
+                // Windows syntax  (mcp_servers directory points to python mcp server)
 //                new StdioMCPClient("math_tools", "cmd", Arrays.asList("/c", "uv", "--directory", "./mcp_servers", "run", "math_tools.py")),
-//                new StdioMCPClient("math_tools", "cmd", Arrays.asList("/c", "uv", "--directory", "D:\\ProjectsCode\\PythonProjects\\GitHub\\OxyGent\\mcp_servers", "run", "math_tools.py")),
+//                new StdioMCPClient("math_tools", "cmd", Arrays.asList("/c", "uv", "--directory", "D:\ProjectsCode\PythonProjects\GitHub\OxyGent\mcp_servers", "run", "math_tools.py")),
 
                 SSEAgent.builder()
                         .name("time_agent")

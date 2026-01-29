@@ -152,6 +152,7 @@ public abstract class BaseAgent extends BaseFlow {
      * @param oxyRequest Request object to save trace data for, cannot be null
      * @throws IllegalArgumentException if oxyRequest is null
      */
+    @Override
     protected void preSaveData(OxyRequest oxyRequest) {
         super.preSaveData(oxyRequest);
         if ("user".equals(oxyRequest.getCallerCategory())) {
@@ -192,6 +193,7 @@ public abstract class BaseAgent extends BaseFlow {
      * @param oxyResponse Response object containing processing results, cannot be null
      * @throws IllegalArgumentException if oxyResponse is null or its contained request is null
      */
+    @Override
     public void postSaveData(OxyResponse oxyResponse) {
         super.postSaveData(oxyResponse);
         OxyRequest oxyRequest = oxyResponse.getOxyRequest();
@@ -219,7 +221,7 @@ public abstract class BaseAgent extends BaseFlow {
                 String currentSubSessionId = oxyRequest.getCurrentTraceId() + "__" + oxyRequest.getSessionName();
                 Map<String, Object> history = new HashMap<>();
                 history.put("query", oxyRequest.getQuery());
-                history.put("answer", oxyResponse.getOutput());
+                history.put("answer",  String.valueOf(oxyResponse.getOutput()));
                 if (oxyResponse.getExtra() != null) {
                     history.putAll(oxyResponse.getExtra());
                 }

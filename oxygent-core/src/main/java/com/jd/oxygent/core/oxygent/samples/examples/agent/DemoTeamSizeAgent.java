@@ -14,6 +14,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Customize the funcProcessInput and funcProcessOutput methods in the agent.
+ *
+ * @author OxyGent Team
+ * @version 1.0.0
+ * @since 1.0.0
+ */
 public class DemoTeamSizeAgent {
 
     @OxySpaceBean(value = "teamSizeAgentJavaOxySpace", defaultStart = true, query = "Hello")

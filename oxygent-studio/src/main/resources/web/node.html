@@ -6,23 +6,23 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <link rel="shortcut icon" href="image/group-favicon.png" type="image/x-icon">
+    <link rel="shortcut icon" href="./image/group-favicon.png" type="image/x-icon">
     <title>Node Visualization</title>
-    <link href="css/normalize.css?time=2" rel="stylesheet">
-    <link href="css/node.css?time=2" rel="stylesheet">
-    <link href="css/style_load1.css?time=2" rel="stylesheet">
-    <link href="css/main.css?time=2" rel="stylesheet">
-    <link href="css/gantt.css?time=2" rel="stylesheet">
-    <link href="css/flowchart_view1.css?time=2" rel="stylesheet">
+    <link href="./css/normalize.css?time=2" rel="stylesheet">
+    <link href="./css/node.css?time=2" rel="stylesheet">
+    <link href="./css/style_load1.css?time=2" rel="stylesheet">
+    <link href="./css/main.css?time=2" rel="stylesheet">
+    <link href="./css/gantt.css?time=2" rel="stylesheet">
+    <link href="./css/flowchart_view1.css?time=2" rel="stylesheet">
 
     <script src="https://code.jquery.com/jquery-1.10.2.js"></script>
-    <script src="js/marked.min.js?time=2"></script>
-    <script src="js/mermaid.min.js?time=2"></script>
+    <script src="./js/marked.min.js?time=2"></script>
+    <script src="./js/mermaid.min.js?time=2"></script>
 
-    <script src="js/mermaid-sdk-gantt.js?time=2"></script>
-    <script src="js/utils.js?time=2"></script>
-    <script src='js/autosize.js?time=2'></script>
-    <script src="js/flowchart.js?time=2"></script>
+    <script src="./js/mermaid-sdk-gantt.js?time=2"></script>
+    <script src="./js/utils.js?time=2"></script>
+    <script src='./js/autosize.js?time=2'></script>
+    <script src="./js/flowchart.js?time=2"></script>
 </head>
 <body>
 
@@ -91,15 +91,15 @@
                 </div>
                 <div class="mod-header-operation">
                     <button class="mod-header-operation-btn" id="pre" onclick="pre()">
-                        <img src="image/arrow-left.svg" alt="">
+                        <img src="./image/arrow-left.svg" alt="">
                         Pre
                     </button>
                     <button class="mod-header-operation-btn" id="next" onclick="next()">
-                        <img src="image/arrow-right.svg" alt="">
+                        <img src="./image/arrow-right.svg" alt="">
                         Next
                     </button>
                     <button class="mod-header-operation-btn" id="call_llm" onclick="call_llm()">
-                        <img src="image/refresh.svg" alt="">
+                        <img src="./image/refresh.svg" alt="">
                         Regenerate
                     </button>
                 </div>
@@ -152,8 +152,12 @@
     ];
 
     const typeMap = {
-        tool: './image/org_tool.svg',
         llm: './image/org_model.svg',
+        tool: './image/org_tool.svg',
+        model: './image/org_model.svg',
+        flow: './image/org_flow.svg',
+        bank: './image/org_knowledge.svg',
+        memory_bank: './image/org_memory.svg',
     };
 
     const urlParams = new URLSearchParams(window.location.search);
@@ -330,12 +334,11 @@
                         if (typeValue === "array") {
                             const argumentPrekey = key;
                             value.forEach(({role, content}) => {
-                                var jsonContent= JSON.stringify(content);
                                 var stringHtml = `
                                     <div class="mod-right-cnt_col">
                                         <label class="text_x_6">${role}:</label>
                                         <div class="mod-right-text_x_8_wrap">
-                                            <textarea data-pre-key="${argumentPrekey}" data-key="${key}" data-type="${typeValue}" data-role="${role}" rows="4" cols="50" id="${role}"  placeholder="None" class="text_x_8">${jsonContent}</textarea>
+                                            <textarea data-pre-key="${argumentPrekey}" data-key="${key}" data-type="${typeValue}" data-role="${role}" rows="4" cols="50" id="${role}"  placeholder="None" class="text_x_8">${content}</textarea>
                                         </div>
                                     </div>
                                 `
@@ -399,7 +402,7 @@
         // 增加loading效果
         $("#llm_result_new").html('<div class="loading"> <span></span> <span></span> <span></span> <span></span> <span></span> </div>');
         // 不可点击效果
-        $("#call_llm").html('<img src="image/refresh.svg" alt=""> planning').prop("disabled", true);
+        $("#call_llm").html('<img src="./image/refresh.svg" alt=""> planning').prop("disabled", true);
 
 
         var class_attrData = {};
@@ -418,13 +421,9 @@
             }
             if (type === "object") {
                 const preType = $($input).attr('data-pre-key');
-                if (!class_attrData[preType]) {
-                    class_attrData[preType] = {
-                       [key]: $($input).val(),
-                    };
-                }else{
-                    class_attrData[preType][key] = $($input).val();
-                }
+                class_attrData[preType] = {
+                    [key]: $($input).val(),
+                };
             }
         })
 
@@ -492,7 +491,7 @@
 
                 $("#llm_result_new").empty();
                 $("#llm_result_new").html(htmlData);
-                $("#call_llm").html('<img src="image/refresh.svg" alt=""> Regenerate').prop("disabled", false);
+                $("#call_llm").html('<img src="./image/refresh.svg" alt=""> Regenerate').prop("disabled", false);
             }
         })
     }

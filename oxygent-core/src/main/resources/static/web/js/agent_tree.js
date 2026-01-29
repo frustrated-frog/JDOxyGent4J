@@ -1,14 +1,8 @@
-/**
- * Agent Tree Component
- * @author OxyGent Team
- * @version 1.0.0
- * @since 1.0.0
- */
 !(function(name, factory) {
     try {
         if ($) {}
     } catch (error) {
-        console.warn(error + "[This project requires jQuery library]");
+        console.warn(error + "【本项目需要依赖jquery库】");
         return
     }
     if (typeof exports === 'object') {
@@ -36,7 +30,7 @@
                 var tag = "",
                     zr = "",
                     tagIndex = 0;
-                /*Pre-process tag markers*/
+                /*提前 处理tag标记*/
                 item.children && $.each(item.children, function(index, item1) {
                     if (item1.type && item1.type == "tag") {
                         tag = `<div class="tagBox">

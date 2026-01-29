@@ -1,10 +1,3 @@
-/**
- * File Upload Utilities
- * @author OxyGent Team
- * @version 1.0.0
- * @since 1.0.0
- */
-
 function uploadFile(file, callback) {
     console.log(file);
     const formData = new FormData();
@@ -17,10 +10,10 @@ function uploadFile(file, callback) {
         .then(response => response.json())
         .then(data => {
             callback(data)
-            // document.getElementById('result').textContent = 'Upload successful: ' + JSON.stringify(data);
+            // document.getElementById('result').textContent = '上传成功: ' + JSON.stringify(data);
         })
         .catch(error => {
             console.log(error);
-            // document.getElementById('result').textContent = 'Upload failed: ' + error;
+            // document.getElementById('result').textContent = '上传失败: ' + error;
         });
 }

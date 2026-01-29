@@ -43,7 +43,6 @@ public class ManualMasFactory extends PlatformMasFactory {
         mas.setRedisClient(redisClient);
         mas.setContextEngine(contextEngine);
         mas.init();
-        masMap.put(masName, mas);
         return mas;
     }
 

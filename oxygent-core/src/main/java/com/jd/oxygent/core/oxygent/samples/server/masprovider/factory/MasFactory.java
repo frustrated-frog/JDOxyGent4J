@@ -129,7 +129,7 @@ public abstract class MasFactory {
      * @return Mas instance
      */
     public final Mas createMas(String masName, List<BaseOxy> oxySpace) {
-        masMap.putIfAbsent(masName, createMultipleMas(masName, oxySpace));
+        masMap.computeIfAbsent(masName, masNameKey -> createMultipleMas(masNameKey, oxySpace));
         Mas mas = masMap.get(masName);
         putMasMeta(mas, masName);
         return mas;

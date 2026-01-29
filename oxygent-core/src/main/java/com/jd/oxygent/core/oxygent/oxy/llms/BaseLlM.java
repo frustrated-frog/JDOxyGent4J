@@ -15,6 +15,8 @@
  */
 package com.jd.oxygent.core.oxygent.oxy.llms;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.jd.oxygent.core.Config;
 import com.jd.oxygent.core.oxygent.infra.multimodal.MultimodalResourceType;
 import com.jd.oxygent.core.oxygent.utils.*;
@@ -28,6 +30,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
@@ -37,6 +40,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.Semaphore;
 import java.util.logging.Logger;
 
 import static com.jd.oxygent.core.oxygent.utils.CommonUtils.getFormatTime;
@@ -125,7 +129,15 @@ public abstract class BaseLlM extends BaseOxy {
      * @since 1.0.0
      */
     @Builder.Default
-    protected double timeout = 300.0;
+    protected double timeout = Config.getLlm().getTimeout();
+
+    @JsonProperty("semaphore")
+    @Builder.Default
+    private int semaphoreCount = Config.getLlm().getSemaphore();
+
+    @Getter
+    @JsonIgnore
+    private Semaphore semaphore = new Semaphore(Config.getLlm().getSemaphore(), true);
 
     /**
      * LLM parameter configuration
@@ -219,6 +231,12 @@ public abstract class BaseLlM extends BaseOxy {
     @Builder.Default
     protected long maxFileSizeBytes = 2 * 1024 * 1024;
 
+    @Builder.Default
+    protected String base64ImagePrefix = "data:image";
+
+    @Builder.Default
+    protected String base64VideoPrefix = "data:video";
+
     /**
      * Preprocess multimodal input messages
      *
@@ -257,16 +275,16 @@ public abstract class BaseLlM extends BaseOxy {
             if (isDisableSystemPrompt &&
                     !messages.isEmpty() && "system".equalsIgnoreCase(messages.get(0).getRole().name())) {
 
-                // 拼接 system prompt 和 user message
+                // Concatenate system prompt and user message
                 String systemContent = messages.get(0).getContent().toString();
                 String userContent = messages.get(1).getContent().toString();
                 String combinedContent = systemContent + "\nUser Input: " + userContent;
 
-                // 更新第二条消息（用户消息）的内容
+                // Update the content of the second message (user message)
                 messages.get(1).setContent(combinedContent);
-                // 移除第一条 system 消息
+                // Remove the first system message
                 messages = messages.subList(1, messages.size());
-                // 更新 arguments 中的 messages（注意：subList 是视图，若需要独立副本可 new ArrayList<>(...)）
+                // Update messages in arguments (Note: subList is a view, use new ArrayList<>(...) if independent copy is needed)
                 oxyRequest.getArguments().put("messages", new ArrayList<>(messages));
             }
 
@@ -348,11 +366,32 @@ public abstract class BaseLlM extends BaseOxy {
             // Hold URL if conversion is disabled
             if (!isConvertUrlToBase64) {
                 return messagesTemp;
+            } else {
+                for (Message message : messages) {
+                    Object content = message.getContent();
+                    if (!(content instanceof List)) {
+                        continue;
+                    }
+                    List<Map<String, Object>> contentList = (List<Map<String, Object>>) content;
+
+                    for (Map<String, Object> item : contentList) {
+                        String itemType = (String) item.get("type");
+                        if ("text".equals(itemType)) {
+                            continue;
+                        }
+                        if ("image_url".equals(itemType)) {
+                            item.put("url", CommonUtils.imageToBase64(item.get("url").toString(), maxImagePixels, base64ImagePrefix));
+                        } else if ("video_url".equals(itemType)) {
+                            item.put("url", CommonUtils.videoToBase64(item.get("url").toString(), maxVideoSize, base64VideoPrefix));
+                        } else {
+                            logger.warning(String.format("Unexpected content type: %s %s %s", itemType,
+                                    oxyRequest.getCurrentTraceId(),
+                                    oxyRequest.getNodeId()));
+                        }
+                    }
+                }
+                return messagesTemp;
             }
-
-            return messagesTemp;
-
-
         } catch (Exception e) {
             logger.warning("Error processing messages: " + e.getMessage());
             throw new CompletionException(e);
@@ -471,6 +510,7 @@ public abstract class BaseLlM extends BaseOxy {
      * @return LLM execution response containing generated content and status information
      * @since 1.0.0
      */
+    @Override
     protected abstract OxyResponse _execute(OxyRequest oxyRequest);
 
     /**
@@ -531,6 +571,7 @@ public abstract class BaseLlM extends BaseOxy {
                     message.put("caller_category", oxyRequest.getCallerCategory());
                     message.put("callee", oxyRequest.getCallee());
                     message.put("callee_category", oxyRequest.getCalleeCategory());
+                    message.put("agent", oxyRequest.getCaller());
                     message.put("content", msg);
                     oxyRequest.sendMessage(message);
                 }

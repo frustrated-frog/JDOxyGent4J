@@ -86,6 +86,10 @@ public class BaseOxy {
     @JsonProperty("input_schema")
     protected Map<String, Object> inputSchema;
 
+    @JsonProperty("system_args")
+    @Builder.Default
+    private List<String> systemArgs = new ArrayList();
+
     @JsonProperty("desc_for_llm")
     @Builder.Default
     private String descForLlm = "";
@@ -106,6 +110,9 @@ public class BaseOxy {
     @Builder.Default
     private boolean isSaveData = true;
 
+    /**
+     * List of tools this entity can call
+     */
     @JsonProperty("permitted_tool_name_list")
     @Builder.Default
     private List<String> permittedToolNameList = new ArrayList<>();
@@ -113,6 +120,13 @@ public class BaseOxy {
     @JsonProperty("extra_permitted_tool_name_list")
     @Builder.Default
     private List<String> extraPermittedToolNameList = new ArrayList<>();
+
+    /**
+     * Additional tool permissions
+     */
+    @JsonProperty("permitted_oxy")
+    @Builder.Default
+    private List<String> permittedOxy = new ArrayList<>();
 
     @JsonProperty("is_send_tool_call")
     @Builder.Default
@@ -157,6 +171,9 @@ public class BaseOxy {
     private Function<OxyRequest, String> funcInterceptor;
 
     @JsonIgnore
+    private Function<OxyRequest, OxyRequest> funcProcessMessage;
+
+    @JsonIgnore
     protected Mas mas;
 
     @JsonProperty("friendly_error_text")
@@ -164,23 +181,40 @@ public class BaseOxy {
 
     @JsonProperty("semaphore")
     @Builder.Default
-    private int semaphoreCount = 16;
+    private int semaphoreCount = Config.getOxy().getSemaphore();
 
     @Getter
     @JsonIgnore
-    private Semaphore semaphore;
+    private Semaphore semaphore = new Semaphore(Config.getOxy().getSemaphore(), true);
 
+    /**
+     * Timeout in seconds
+     */
     @JsonProperty("timeout")
     @Builder.Default
-    private double timeout = 3600.0;
+    private double timeout = Config.getOxy().getTimeout();
 
     @JsonProperty("retries")
     @Builder.Default
-    private int retries = 2;
+    private int retries = Config.getOxy().getRetries();
 
+    /**
+     * delay in seconds
+     */
     @JsonProperty("delay")
     @Builder.Default
-    private double delay = 1.0;
+    private double delay = Config.getOxy().getDelay();
+
+    /**
+     * A list of oxy names that must be called before the current oxy.
+     */
+    @JsonProperty("preceding_oxy")
+    @Builder.Default
+    private List<String> precedingOxy = new ArrayList();
+
+    @JsonProperty("preceding_placeholder")
+    @Builder.Default
+    private String precedingPlaceholder = "preceding_text";
 
     /**
      * Add permitted tool to the tool list
@@ -214,7 +248,7 @@ public class BaseOxy {
      * This method generates a formatted description that includes tool name,
      * description, and argument details.
      */
-    protected void setDescForLlm() {
+    public void setDescForLlm() {
         List<String> argsDesc = new ArrayList<>();
 
         if (inputSchema != null && inputSchema.containsKey("properties")) {
@@ -237,8 +271,8 @@ public class BaseOxy {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> paramInfo = (Map<String, Object>) paramInfoObj;
                     String description = (String) paramInfo.get("description");
-                    if ("SystemArg".equals(description)) {
-                        log.debug("Skipping system parameter: {}", paramName);
+                    if (description != null && description.startsWith("SystemArg")) {
+                        systemArgs.add(description.substring(10)); // remove prefix "SystemArg."
                         continue;
                     }
 
@@ -284,11 +318,8 @@ public class BaseOxy {
         } else {
             this.inputSchema = this.getInputSchema();
         }
-        if (this.semaphore == null) {
-            this.semaphore = new Semaphore(this.semaphoreCount, true);
-        }
-
         setDescForLlm();
+        permittedOxy.addAll(precedingOxy);
     }
 
     /**
@@ -350,11 +381,12 @@ public class BaseOxy {
         if (oxyRequest == null) {
             throw new IllegalArgumentException("OxyRequest cannot be null");
         }
-        if (oxyRequest.getReferenceTraceId() == null ||
-                !oxyRequest.isLoadDataForRestart() ||
-                mas == null ||
-                mas.getEsClient() == null ||
-                (!"llm".equals(this.getCategory()) && !"tool".equals(this.getCategory()))) {
+        if (oxyRequest.getReferenceTraceId() == null
+                || oxyRequest.getRestartNodeId() == null
+                || !oxyRequest.isLoadDataForRestart()
+                || mas == null
+                || mas.getEsClient() == null
+                || (!"llm".equals(this.getCategory()) && !"tool".equals(this.getCategory()))) {
             return null;
         }
 
@@ -524,7 +556,13 @@ public class BaseOxy {
             content.put("caller_category", oxyRequest.getCallerCategory());
             content.put("callee_category", oxyRequest.getCalleeCategory());
             content.put("call_stack", oxyRequest.getCallStack());
-            content.put("arguments", oxyRequest.getArguments());
+            if (oxyRequest.getArguments() != null) {
+                if (Config.getMessage().isSendFullArguments()) {
+                    content.put("arguments", oxyRequest.getArguments());
+                } else if (oxyRequest.getArguments().get("query") != null) {
+                    content.put("arguments", Map.of("query", oxyRequest.getArguments().get("query")));
+                }
+            }
             content.put("request_id", oxyRequest.getRequestId());
             content.put("current_trace_id", oxyRequest.getCurrentTraceId());
             content.put("from_trace_id", oxyRequest.getFromTraceId());
@@ -536,6 +574,17 @@ public class BaseOxy {
     }
 
     protected OxyRequest beforeExecute(OxyRequest oxyRequest) {
+        if (precedingOxy != null && !precedingOxy.isEmpty()) {
+            List<String> output = new ArrayList<>();
+            for (String oxyName : precedingOxy) {
+                Map<String, Object> kwargs = new HashMap<>();
+                kwargs.put("callee", oxyName);
+                kwargs.put("arguments", oxyRequest.getArguments());
+                OxyResponse oxyResponse = oxyRequest.call(kwargs);
+                output.add((String) oxyResponse.getOutput());
+            }
+            oxyRequest.getArguments().put(precedingPlaceholder, String.join("\n", output));
+        }
         return oxyRequest;
     }
 
@@ -637,7 +686,6 @@ public class BaseOxy {
             content.put("from_trace_id", oxyRequest.getFromTraceId());
             content.put("group_id", oxyRequest.getGroupId());
             message.put("content", content);
-
             oxyRequest.sendMessage(message);
         }
         if (isSendAnswer && "user".equals(oxyRequest.getCallerCategory())) {

@@ -16,6 +16,8 @@
 package com.jd.oxygent.core;
 
 import com.jd.oxygent.core.oxygent.oxy.BaseOxy;
+import com.jd.oxygent.core.oxygent.oxy.agents.LocalAgent;
+import com.jd.oxygent.core.oxygent.utils.CommonUtils;
 import org.springframework.beans.factory.FactoryBean;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.config.AutowireCapableBeanFactory;
@@ -316,7 +318,8 @@ public class MasFactoryBean implements FactoryBean<Mas> {
                 .map(o -> {
                     String cls = (o == null) ? "null" : o.getClass().getName();
                     String nm = (o == null || o.getName() == null) ? "null" : o.getName();
-                    return cls + ":" + nm;
+                    String promptMD5 = (o != null && o instanceof LocalAgent localAgent) ? CommonUtils.getMD5(localAgent.getPrompt()) : "null"; // avoid prompt modification
+                    return cls + ":" + nm + ":" + promptMD5;
                 })
                 .collect(Collectors.joining("|"));
         try {

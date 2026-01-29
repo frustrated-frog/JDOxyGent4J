@@ -3,6 +3,7 @@
 在OxyGent中，建议通过[FunctionHub](../development/api/function_tools/function_hub.md)注册本地工具。Java版本支持两种方式：程序化注册和注解注册。您也可以使用MCP注册工具，具体参考[使用MCP自定义工具](./02-04-use_mcp_tools.md)或[使用MCP开源工具](./02-03-use_opensource_tools.md)。
 
 ## 步骤 1：创建工具类（推荐注解方式）
+
 首先，您可以创建一个继承自 `FunctionHub` 的工具类，并使用注解注册工具：
 
 ```java
@@ -24,6 +25,7 @@ public class FileTools extends FunctionHub {
 ```
 
 ## 步骤 2：使用注解注册工具
+
 使用 `@Tool` 注解将 Java 方法注册为工具，例如，您可以注册一些基础的文件操作工具：
 
 ```java
@@ -202,16 +204,16 @@ public static class JokeTool extends FunctionHub {
 
 ### 注解式vs程序式注册对比
 
-| 特性 | 注解式注册 | 程序式注册 |
-|-----|-----------|-----------|
-| **代码简洁性** | ✅ 更简洁，声明式 | 需要手动注册代码 |
-| **类型安全** | ✅ 编译时检查 | 运行时绑定 |
-| **IDE支持** | ✅ 更好的代码提示 | 一般 |
-| **灵活性** | 适合固定工具 | ✅ 更灵活，动态注册 |
-| **学习成本** | ✅ 更低 | 需要理解注册API |
-
+| 特性        | 注解式注册     | 程序式注册      |
+| --------- | --------- | ---------- |
+| **代码简洁性** | ✅ 更简洁，声明式 | 需要手动注册代码   |
+| **类型安全**  | ✅ 编译时检查   | 运行时绑定      |
+| **IDE支持** | ✅ 更好的代码提示 | 一般         |
+| **灵活性**   | 适合固定工具    | ✅ 更灵活，动态注册 |
+| **学习成本**  | ✅ 更低      | 需要理解注册API  |
 
 **参考现有示例**:
+
 - [DemoFunctionHub.java](../../oxygent-core/src/main/java/com/jd/oxygent/core/oxygent/samples/examples/tools/DemoFunctionHub.java) - 基础工具注册和使用
 - [DemoFunctionHubAnnotation.java](../../oxygent-core/src/main/java/com/jd/oxygent/core/oxygent/samples/examples/tools/DemoFunctionHubAnnotation.java) - 高级注解式工具注册
 
@@ -295,6 +297,6 @@ public class FileTools extends FunctionHub {
 }
 ```
 
-[上一章：选择智能体种类](./01-05-select_agent.md)
+[上一章：如何使用动态提示词（Live Prompts）](./01-07-live_prompt.md)
 [下一章：使用MCP开源工具](./02-03-use_opensource_tools.md)
 [回到首页](./readme.md)

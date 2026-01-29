@@ -15,6 +15,7 @@
  */
 package com.jd.oxygent.core.oxygent.oxy.llms;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyRequest;
 import com.jd.oxygent.core.oxygent.schemas.oxy.OxyResponse;
 import lombok.AllArgsConstructor;
@@ -22,10 +23,12 @@ import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
+import org.apache.commons.collections4.MapUtils;
 
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * <h3>Remote LLM Abstract Base Class</h3>
@@ -112,6 +115,12 @@ public abstract class RemoteLlm extends BaseLlM {
     protected String modelName;
     protected Map<String, String> headers;
     protected Map<String, Object> llmParams;
+    /**
+     * function customization and message processing
+     *  CAUTION: this function will be called every time a request is made to remote_llm, and will override the default headers
+     */
+    @JsonIgnore
+    private Function<OxyRequest, Map> funcHeaders;
 
     /**
      * Create remote LLM instance
@@ -172,7 +181,7 @@ public abstract class RemoteLlm extends BaseLlM {
      * @param llmParams Extended LLM parameter configuration, can be null, will automatically create empty mapping
      * @throws IllegalArgumentException if baseUrl or modelName is empty or invalid
      */
-    public RemoteLlm(String baseUrl, String apiKey, String modelName, Duration timeout, Map<String, Object> llmParams, Map<String, String> headers) {
+    public RemoteLlm(String baseUrl, String apiKey, String modelName, Duration timeout, Map<String, Object> llmParams, Map<String, String> headers, Function funcHeaders) {
         if (baseUrl == null || baseUrl.trim().isEmpty()) {
             throw new IllegalArgumentException("baseUrl must be a non-empty string");
         }
@@ -184,8 +193,27 @@ public abstract class RemoteLlm extends BaseLlM {
         this.modelName = modelName;
         this.llmParams = llmParams != null ? llmParams : new HashMap<>();
         this.headers = headers != null ? headers : new HashMap<>();
+        this.funcHeaders = funcHeaders;
     }
 
+    @Override
     protected abstract OxyResponse _execute(OxyRequest oxyRequest);
+
+    /**
+     * CAUTION: this function will be called every time a request is made to remote_llm, and will override the default headers
+     *
+     * @param oxyRequest
+     * @return
+     */
+    protected Map<String, String> headers(OxyRequest oxyRequest) {
+        HashMap<String, String> resultHeadMap = new HashMap<>();
+        if (MapUtils.isNotEmpty(this.headers)) {
+            resultHeadMap.putAll(this.headers);
+        }
+        if (funcHeaders != null) {
+            return funcHeaders.apply(oxyRequest);
+        }
+        return resultHeadMap;
+    }
 
 }
